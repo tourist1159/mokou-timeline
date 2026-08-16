@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>もこう アーカイブタイムライン</title>
+  <meta name="description" content="もこうの YouTube 動画・配信と Kick 配信を時系列でまとめて表示" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>もこう アーカイブタイムライン</h1>
+    <p class="tagline">YouTube の動画・配信と Kick の配信を、まとめて時系列で。</p>
+    <div id="stats" class="stats"></div>
+  </header>
+
+  <div class="controls">
+    <div class="control-group" id="filter-platform" data-key="platform">
+      <span class="control-label">配信元</span>
+      <button class="chip active" data-value="all">すべて</button>
+      <button class="chip" data-value="youtube">YouTube</button>
+      <button class="chip" data-value="kick">Kick</button>
+    </div>
+
+    <div class="control-group" id="filter-channel" data-key="channel">
+      <span class="control-label">チャンネル</span>
+      <button class="chip active" data-value="all">すべて</button>
+      <!-- チャンネルのチップは app.js が動的に追加 -->
+    </div>
+
+    <div class="control-group" id="filter-type" data-key="type">
+      <span class="control-label">種別</span>
+      <button class="chip active" data-value="all">すべて</button>
+      <button class="chip" data-value="stream">配信</button>
+      <button class="chip" data-value="video">動画</button>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">並び</span>
+      <button class="chip active" id="sort-toggle" data-order="desc">新しい順</button>
+    </div>
+
+    <div class="control-group search-group">
+      <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
+    </div>
+  </div>
+
+  <main id="grid" class="grid" aria-live="polite"></main>
+
+  <div id="empty" class="empty" hidden>該当するアイテムがありません。</div>
+
+  <footer class="site-footer">
+    <span id="footer-note"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
