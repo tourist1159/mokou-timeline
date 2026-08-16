@@ -18,7 +18,7 @@ const CONFIG = {
 
 /* ===== 状態 ===== */
 let ALL = [];
-const state = { platform: "all", channel: "all", type: "all", order: "desc", q: "" };
+const state = { platform: "all", channel: "all", type: "all", order: "desc", q: "", view: "grid" };
 
 /* ===== ユーティリティ ===== */
 const dateFmt = new Intl.DateTimeFormat("ja-JP", {
@@ -214,6 +214,7 @@ function render() {
   const list = applyFilters();
   const grid = document.getElementById("grid");
   const empty = document.getElementById("empty");
+  grid.classList.toggle("view-list", state.view === "list");
   grid.textContent = "";
 
   const frag = document.createDocumentFragment();
@@ -261,7 +262,7 @@ function buildChannelChips() {
 /* ===== URL クエリ同期 ===== */
 function readQuery() {
   const p = new URLSearchParams(location.search);
-  for (const k of ["platform", "channel", "type", "order", "q"]) {
+  for (const k of ["platform", "channel", "type", "order", "q", "view"]) {
     if (p.has(k)) state[k] = p.get(k);
   }
 }
@@ -269,6 +270,7 @@ function writeQuery() {
   const p = new URLSearchParams();
   for (const k of ["platform", "channel", "type"]) if (state[k] !== "all") p.set(k, state[k]);
   if (state.order !== "desc") p.set("order", state.order);
+  if (state.view !== "grid") p.set("view", state.view);
   if (state.q) p.set("q", state.q);
   const qs = p.toString();
   history.replaceState(null, "", qs ? "?" + qs : location.pathname);

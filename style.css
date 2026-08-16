@@ -222,6 +222,30 @@ body {
 .card-date { width: 100%; }
 .comments::before { content: "💬 "; }
 
+/* ---- List view ---- */
+#grid.view-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#grid.view-list .card {
+  flex-direction: row;
+}
+#grid.view-list .thumb {
+  flex: 0 0 168px;
+  width: 168px;
+  aspect-ratio: 16 / 9;
+}
+#grid.view-list .card-body {
+  padding: 8px 14px;
+  gap: 6px;
+}
+#grid.view-list .card-title {
+  -webkit-line-clamp: 2;
+  min-height: 0;
+  font-size: 0.95rem;
+}
+
 /* ---- Empty / Footer ---- */
 .empty {
   text-align: center;
@@ -249,4 +273,6 @@ body {
   .site-header h1 { font-size: 1.3rem; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 14px; }
   .card-title { font-size: 0.82rem; }
+  #grid.view-list .thumb { flex: 0 0 120px; width: 120px; }
+  #grid.view-list .card-body { padding: 6px 10px; }
 }
