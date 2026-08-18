@@ -76,7 +76,8 @@ function normalizeKick(arr) {
     durationSec: Math.round((v.duration || 0) / 1000), // ms → 秒
     lengthStr: v.video_length || "",
     comments: typeof v.number_of_comments === "number" ? v.number_of_comments : null,
-    thumbnail: null, // Kick はサムネ未保存 → プレースホルダー
+    // 削除済み動画は fetcher がサムネを取得できないため null → プレースホルダー表示
+    thumbnail: v.thumbnail || null,
     // Kick は一定期間で古いVODを削除する。available:false は動画がもう存在しない。
     available: v.available !== false,
   }));
@@ -133,7 +134,8 @@ function makeThumb(item) {
     img.dataset.tries = "0";
     img.onerror = () => {
       const tries = Number(img.dataset.tries);
-      if (tries === 0 && item.videoId) {
+      // YouTube のみ別解像度で再試行 (Kick の videoId は数値IDなので流用できない)
+      if (tries === 0 && item.platform === "youtube" && item.videoId) {
         img.dataset.tries = "1";
         img.src = `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
       } else {
