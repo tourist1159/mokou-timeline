@@ -160,22 +160,6 @@ function makeThumb(item) {
   dur.textContent = fmtDuration(item.durationSec, item.lengthStr);
   wrap.appendChild(dur);
 
-  // コメントデータがある配信のみ、流量グラフを開くボタンを表示
-  if (item.comments != null && item.comments > 0) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "graph-btn";
-    btn.title = "コメント流量グラフを見る";
-    btn.setAttribute("aria-label", "コメント流量グラフを見る");
-    btn.textContent = "📊";
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      window.openCommentGraph(item);
-    });
-    wrap.appendChild(btn);
-  }
-
   return wrap;
 }
 
@@ -239,6 +223,22 @@ function makeCard(item) {
     del.className = "tag deleted";
     del.textContent = "削除済み";
     meta.appendChild(del);
+  }
+
+  // コメントデータがある配信のみ、流量グラフを開くボタンを表示（説明部分の右側）
+  if (item.comments != null && item.comments > 0) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "graph-btn";
+    btn.title = "コメント流量グラフを見る";
+    btn.setAttribute("aria-label", "コメント流量グラフを見る");
+    btn.textContent = "📊";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.openCommentGraph(item);
+    });
+    meta.appendChild(btn);
   }
 
   body.appendChild(meta);

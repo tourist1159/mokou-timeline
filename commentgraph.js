@@ -173,7 +173,28 @@ function bucketComments(filtered, lastOffset) {
   return { labels, totalCounts, keywordCounts };
 }
 
-function renderChart(canvas, agg) {
+function fmtHms(totalSec) {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = Math.floor(totalSec % 60);
+  const p = (n) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+}
+
+// YouTube の「開く」リンクに時刻ジャンプ(&t=Ns)を付与する。
+// Kick は時刻付きURLを未サポートのため対象外（リンクは動画先頭のまま）。
+function setYoutubeSeekLink(link, item, seconds) {
+  try {
+    const u = new URL(item.url);
+    u.searchParams.set("t", Math.max(0, Math.round(seconds)) + "s");
+    link.href = u.toString();
+    link.textContent = `YouTubeで開く（${fmtHms(seconds)}〜）`;
+  } catch (e) {
+    /* URL解析に失敗した場合は何もしない */
+  }
+}
+
+function renderChart(canvas, agg, item, link) {
   const ctx = canvas.getContext("2d");
   return new window.Chart(ctx, {
     type: "line",
@@ -220,6 +241,13 @@ function renderChart(canvas, agg) {
         tooltip: {
           callbacks: { title: (items) => (items.length ? "経過 " + items[0].label : "") },
         },
+      },
+      onClick: (evt, _elements, chartInstance) => {
+        if (item.platform !== "youtube") return; // Kick は時刻ジャンプ非対応
+        const points = chartInstance.getElementsAtEventForMode(evt, "nearest", { intersect: false }, true);
+        if (!points.length) return;
+        const index = points[0].index; // 経過分（1分バケットのインデックス）
+        setYoutubeSeekLink(link, item, index * 60);
       },
       scales: {
         x: { display: false },
@@ -289,7 +317,7 @@ async function openCommentGraph(item) {
 
     status.hidden = true;
     chartWrap.hidden = false;
-    currentChart = renderChart(canvas, agg);
+    currentChart = renderChart(canvas, agg, item, link);
   } catch (e) {
     if (seq !== requestSeq) return;
     console.error("[CommentGraph]", e);

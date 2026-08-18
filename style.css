@@ -173,25 +173,25 @@ body {
 .badge-platform.youtube { background: var(--yt); }
 .badge-platform.kick { background: var(--kick); color: #0f0f0f; }
 .graph-btn {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
   width: 26px;
-  height: 26px;
+  height: 22px;
   padding: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   line-height: 1;
-  background: rgba(0, 0, 0, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #fff;
+  color: var(--text);
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
 }
-.graph-btn:hover { background: rgba(0, 0, 0, 0.92); transform: scale(1.08); }
+.graph-btn:hover { background: var(--surface-2); border-color: rgba(255, 255, 255, 0.3); }
 .duration {
   position: absolute;
   bottom: 8px;
@@ -258,6 +258,11 @@ body {
   justify-content: center;
   padding: 20px;
   z-index: 100;
+}
+/* display:flex を明示しているため [hidden] の既定 display:none が上書きされてしまう。
+   閉じたときに背景/パネルまで確実に消えるよう明示的に上書きする。 */
+.graph-modal-backdrop[hidden] {
+  display: none;
 }
 .graph-modal-panel {
   background: var(--surface);
