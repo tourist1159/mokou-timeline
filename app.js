@@ -61,6 +61,7 @@ function normalizeYouTube(arr) {
     lengthStr: v.video_length || "",
     comments: typeof v.number_of_comments === "number" ? v.number_of_comments : null,
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
+    available: v.available !== false, // フラグ未設定は視聴可能とみなす
   }));
 }
 function normalizeKick(arr) {
@@ -76,6 +77,8 @@ function normalizeKick(arr) {
     lengthStr: v.video_length || "",
     comments: typeof v.number_of_comments === "number" ? v.number_of_comments : null,
     thumbnail: null, // Kick はサムネ未保存 → プレースホルダー
+    // Kick は一定期間で古いVODを削除する。available:false は動画がもう存在しない。
+    available: v.available !== false,
   }));
 }
 
@@ -164,11 +167,16 @@ function makePlaceholder(item) {
 }
 
 function makeCard(item) {
-  const card = document.createElement("a");
-  card.className = "card";
-  card.href = item.url;
-  card.target = "_blank";
-  card.rel = "noopener noreferrer";
+  // 削除済みの動画はリンクにしない (クリックしても404になるだけのため)
+  const card = document.createElement(item.available ? "a" : "div");
+  card.className = item.available ? "card" : "card unavailable";
+  if (item.available) {
+    card.href = item.url;
+    card.target = "_blank";
+    card.rel = "noopener noreferrer";
+  } else {
+    card.title = "この動画は配信元で削除されています";
+  }
 
   card.appendChild(makeThumb(item));
 
@@ -205,6 +213,13 @@ function makeCard(item) {
     meta.appendChild(c);
   }
 
+  if (!item.available) {
+    const del = document.createElement("span");
+    del.className = "tag deleted";
+    del.textContent = "削除済み";
+    meta.appendChild(del);
+  }
+
   body.appendChild(meta);
   card.appendChild(body);
   return card;
@@ -239,9 +254,11 @@ function updateStats(shown) {
     s.innerHTML = html;
     el.appendChild(s);
   };
+  const gone = ALL.filter((x) => !x.available).length;
   add(`表示 <b>${shown}</b> / 全 <b>${ALL.length}</b> 件`);
   add(`YouTube <b>${yt}</b>・Kick <b>${kk}</b>`);
   add(`配信 <b>${streams}</b>・動画 <b>${videos}</b>`);
+  if (gone) add(`視聴可 <b>${ALL.length - gone}</b>・削除済み <b>${gone}</b>`);
   if (range) add(`期間 <b>${range}</b>`);
 }
 

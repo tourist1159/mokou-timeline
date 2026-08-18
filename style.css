@@ -219,6 +219,12 @@ body {
 }
 .tag.stream { color: #ffb3b3; border-color: rgba(255, 100, 100, 0.4); }
 .tag.video { color: #9fd0ff; border-color: rgba(62, 166, 255, 0.4); }
+.tag.deleted { color: #ffb066; border-color: rgba(255, 150, 60, 0.45); }
+
+/* 配信元で削除された動画 (情報は残すがリンクはしない) */
+.card.unavailable { opacity: 0.5; cursor: default; }
+.card.unavailable:hover { transform: none; border-color: var(--border); }
+.card.unavailable .thumb { filter: grayscale(1); }
 .card-date { width: 100%; }
 .comments::before { content: "💬 "; }
 
