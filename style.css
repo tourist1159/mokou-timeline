@@ -172,6 +172,26 @@ body {
 }
 .badge-platform.youtube { background: var(--yt); }
 .badge-platform.kick { background: var(--kick); color: #0f0f0f; }
+.graph-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.graph-btn:hover { background: rgba(0, 0, 0, 0.92); transform: scale(1.08); }
 .duration {
   position: absolute;
   bottom: 8px;
@@ -227,6 +247,85 @@ body {
 .card.unavailable .thumb { filter: grayscale(1); }
 .card-date { width: 100%; }
 .comments::before { content: "💬 "; }
+
+/* ---- Comment graph modal ---- */
+.graph-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+.graph-modal-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.graph-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-modal-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.graph-modal-close {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.graph-modal-close:hover { background: var(--surface-2); }
+.graph-modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  min-height: 200px;
+  display: flex;
+  align-items: stretch;
+}
+.graph-modal-status {
+  margin: auto;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 40px 10px;
+}
+.graph-modal-chart {
+  width: 100%;
+  height: 320px;
+  position: relative;
+}
+.graph-modal-footer {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--border);
+}
+.graph-modal-link {
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.graph-modal-link:hover { text-decoration: underline; }
 
 /* ---- List view ---- */
 #grid.view-list {

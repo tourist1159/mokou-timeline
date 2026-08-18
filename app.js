@@ -62,6 +62,7 @@ function normalizeYouTube(arr) {
     comments: typeof v.number_of_comments === "number" ? v.number_of_comments : null,
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
     available: v.available !== false, // フラグ未設定は視聴可能とみなす
+    commentsKey: v.video_id, // comments_github/<commentsKey>_comments.json
   }));
 }
 function normalizeKick(arr) {
@@ -80,6 +81,8 @@ function normalizeKick(arr) {
     thumbnail: v.thumbnail || null,
     // Kick は一定期間で古いVODを削除する。available:false は動画がもう存在しない。
     available: v.available !== false,
+    // comments_github のファイル名はアーカイブ "id"（内部動画IDの video_id ではない）
+    commentsKey: v.id,
   }));
 }
 
@@ -156,6 +159,22 @@ function makeThumb(item) {
   dur.className = "duration";
   dur.textContent = fmtDuration(item.durationSec, item.lengthStr);
   wrap.appendChild(dur);
+
+  // コメントデータがある配信のみ、流量グラフを開くボタンを表示
+  if (item.comments != null && item.comments > 0) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "graph-btn";
+    btn.title = "コメント流量グラフを見る";
+    btn.setAttribute("aria-label", "コメント流量グラフを見る");
+    btn.textContent = "📊";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.openCommentGraph(item);
+    });
+    wrap.appendChild(btn);
+  }
 
   return wrap;
 }

@@ -22,6 +22,10 @@
 - 件数・期間の統計表示
 - カード表示（サムネ・長さ・日時(JST)・バッジ・コメント数・元動画へのリンク）
 - フィルタ/検索/並びは URL クエリに反映（共有可能）
+- **コメント流量グラフ**: コメントデータがある配信（カードに📊ボタン）はクリックでモーダル表示。
+  1分バケットの全コメント数＋キーワード別カウントを Chart.js で描画。埋め込みプレイヤーは
+  持たないため、時刻クリックでのシークは無く「元動画を開く」リンクのみ（Kick は VOD ページを
+  iframe化できない制約があるため、YouTube/Kick で同じ体験に揃えている）。
 
 サムネイルは YouTube が動画 ID から生成、Kick は fetcher が保存した `thumbnail`（`images.kick.com`）
 を使う。Kick で取得できないもの（削除済み動画）はプレースホルダー表示。
@@ -38,6 +42,8 @@ JSON の `available: false` がそれを示し、サイトでは**リンクを�
 - `index.html` … ページ構造
 - `style.css` … ダークテーマ・レスポンシブ
 - `app.js` … 取得→正規化→統合→描画→フィルタ/検索（先頭の `CONFIG` に取得先URL等を集約）
+- `commentgraph.js` … コメント流量グラフのモーダル（取得→正規化→重複除去→1分バケット集計→描画）
+- `chart/chart.umd.js` … Chart.js 本体（ローカル同梱、CDN 依存なし）
 
 ## ローカル確認
 
@@ -56,8 +62,8 @@ python -m http.server 8080
 
 取得先リポジトリ名/アカウントを変える場合は `app.js` 先頭の `CONFIG.sources` を修正する。
 
-## 今後（phase 2 候補）
+## 今後（候補）
 
-- YouTube 配信のコメント流量グラフ詳細表示（`commentgraph.js` + Chart.js の再利用）
-- Kick サムネの実取得（kick-comment-fetcher 拡張）
+- コメント流量グラフに埋め込みプレイヤー＋時刻クリックでシーク（YouTube のみ実現可能。
+  Kick は VOD ページが `X-Frame-Options: SAMEORIGIN` のため iframe 埋め込み不可）
 - YouTube 収集窓（`USER_START_DATE`）を過去へ拡張して Kick と期間を揃える
