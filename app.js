@@ -5,6 +5,8 @@ const CONFIG = {
   sources: {
     youtube: "https://tourist1159.github.io/youtube-comment-fetcher/youtube_archives.json",
     kick: "https://tourist1159.github.io/kick-comment-fetcher/kick_archives.json",
+    // 同一オリジン (このサイト自身が5分間隔で更新・公開する)
+    liveStatus: "live_status.json",
   },
   // チャンネル表示名（フィルタチップ・カードのバッジ用）
   channelLabels: {
@@ -18,6 +20,7 @@ const CONFIG = {
 
 /* ===== 状態 ===== */
 let ALL = [];
+let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
 const state = { platform: "all", channel: "all", type: "all", order: "desc", q: "", view: "grid" };
 
 /* ===== ユーティリティ ===== */
@@ -97,6 +100,12 @@ async function loadData() {
       if (!r.ok) throw new Error("Kick JSON HTTP " + r.status);
       return r.json();
     }),
+    // ライブ状態は無くても致命的でない (5分間隔更新の付加情報) ので、
+    // 失敗しても "failed" 扱いにはせず静かに空配列のままにする。
+    fetch(CONFIG.sources.liveStatus, { cache: "no-cache" }).then((r) => {
+      if (!r.ok) throw new Error("live_status.json HTTP " + r.status);
+      return r.json();
+    }),
   ]);
 
   const items = [];
@@ -105,6 +114,7 @@ async function loadData() {
   else failed.push("YouTube");
   if (results[1].status === "fulfilled") items.push(...normalizeKick(results[1].value));
   else failed.push("Kick");
+  LIVE = results[2].status === "fulfilled" ? (results[2].value.live || []) : [];
 
   // 不正エントリ（日時なし等）を除外
   ALL = items.filter((x) => x.start && !isNaN(x.start) && x.title && x.url);
@@ -246,6 +256,82 @@ function makeCard(item) {
   return card;
 }
 
+/* ===== ライブ配信中バナー ===== */
+function makeLiveCard(item) {
+  const card = document.createElement("a");
+  card.className = "live-card";
+  card.href = item.url;
+  card.target = "_blank";
+  card.rel = "noopener noreferrer";
+
+  const thumb = document.createElement("div");
+  thumb.className = "live-thumb";
+  if (item.thumbnail) {
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.alt = "";
+    img.src = item.thumbnail;
+    img.onerror = () => img.remove();
+    thumb.appendChild(img);
+  }
+  const dot = document.createElement("span");
+  dot.className = "live-dot";
+  dot.textContent = "LIVE";
+  thumb.appendChild(dot);
+  card.appendChild(thumb);
+
+  const info = document.createElement("div");
+  info.className = "live-info";
+  const title = document.createElement("div");
+  title.className = "live-title";
+  title.textContent = item.title;
+  info.appendChild(title);
+
+  const meta = document.createElement("div");
+  meta.className = "live-meta";
+  const platformSpan = document.createElement("span");
+  platformSpan.className = "badge-platform " + item.platform;
+  platformSpan.textContent = item.platform === "youtube" ? "YouTube" : "Kick";
+  meta.appendChild(platformSpan);
+  const chSpan = document.createElement("span");
+  chSpan.textContent = channelLabel(item.channel);
+  meta.appendChild(chSpan);
+  if (typeof item.viewers === "number") {
+    const v = document.createElement("span");
+    v.textContent = `👁 ${item.viewers.toLocaleString()}`;
+    meta.appendChild(v);
+  }
+  info.appendChild(meta);
+  card.appendChild(info);
+
+  return card;
+}
+
+function renderLiveBanner() {
+  const el = document.getElementById("live-banner");
+  el.textContent = "";
+  if (!LIVE.length) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  const frag = document.createDocumentFragment();
+  for (const item of LIVE) frag.appendChild(makeLiveCard(item));
+  el.appendChild(frag);
+}
+
+async function refreshLiveStatus() {
+  try {
+    const r = await fetch(CONFIG.sources.liveStatus, { cache: "no-cache" });
+    if (!r.ok) return;
+    const data = await r.json();
+    LIVE = data.live || [];
+    renderLiveBanner();
+  } catch (e) {
+    // 次回のポーリングで回復するため、ここでは何もしない
+  }
+}
+
 function render() {
   const list = applyFilters();
   const grid = document.getElementById("grid");
@@ -377,6 +463,7 @@ async function main() {
   readQuery();
   syncChipUI();
   wireEvents();
+  renderLiveBanner();
   render();
 
   if (failed.length) {
@@ -389,6 +476,9 @@ async function main() {
   const foot = document.getElementById("footer-note");
   foot.textContent =
     "データ源: youtube-comment-fetcher / kick-comment-fetcher（GitHub Pages）。読み込み時に最新を取得します。";
+
+  // ライブ配信中の状態は定期的にポーリングして更新する (軽量な live_status.json のみ再取得)
+  setInterval(refreshLiveStatus, 60000);
 }
 
 main();
