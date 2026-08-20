@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-08-20T16:05:56.606404+00:00",
-  "live": []
+  "checked_at": "2026-08-20T16:49:35.855002+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "朝に筋トレしたらあかん",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": null,
+      "viewers": 767
+    }
+  ]
 }
