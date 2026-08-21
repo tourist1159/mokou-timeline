@@ -2,10 +2,13 @@ name: Live Status Checker
 
 on:
   schedule:
-    # cron の最小粒度は5分なので、発火自体は "*/5"。実際の検知間隔は1分にするため、
-    # 1回の run のなかで check_live.py を1分おきに繰り返し実行する (下の Check live status)。
-    # 発火は GitHub 側の負荷で多少遅れることがある("best effort")。
-    - cron: "*/5 * * * *"
+    # 実測: GitHub Actions の schedule は高頻度(5分おき)だと数十分〜1時間近く
+    # ずれ込むことがある("best effort"、公式ドキュメントにも明記されている実際の挙動)。
+    # そのためこの cron はあくまで「たまに撃ち直すきっかけ」でしかなく、実際の1分間隔
+    # ループは下の job 自体を GitHub-hosted runner の上限(6時間)近くまで長時間
+    # 走らせ続けることで実現する。cron がどれだけ遅れても、走っている job が
+    # そのあいだ1分おきにチェックし続けるので検知の隙間ができない。
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,15 +16,16 @@ permissions:
 
 concurrency:
   group: live-status
-  # 次の run が始まったら古い run は打ち切る。cron が遅れても、古い run が
-  # そのあいだループを続けているので検知の隙間ができない。
+  # 新しい run が(遅れて)始まったら古い run を打ち切って引き継ぐ。
+  # 古い run は誤って残っても実害はない(次のループで同じ内容をcommitしようとして
+  # 差分無しでスキップされるだけ)が、二重にAPIを叩き続けるのは無駄なので止める。
   cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    # ループ(5分半)+セットアップぶんの余裕。ハングしても次の run が引き継ぐ。
-    timeout-minutes: 10
+    # GitHub-hosted runner の1job上限(6時間)近くまで。setup分の余裕を見て355分。
+    timeout-minutes: 355
 
     steps:
       - name: Checkout repository
@@ -36,9 +40,8 @@ jobs:
 
       - name: Check live status (1分おきにループ)
         env:
-          # 次の cron 発火(5分後)と少し重なる長さまで回す。重なったぶんは
-          # concurrency の cancel-in-progress で解消される。
-          LOOP_SECONDS: "330"
+          # setup分・最後のpush分を差し引いた、job内で回せる時間(340分)。
+          LOOP_SECONDS: "20400"
           INTERVAL_SECONDS: "60"
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
@@ -58,7 +61,7 @@ jobs:
             fi
             elapsed=$(( SECONDS - start ))
             if [ "$elapsed" -ge "$LOOP_SECONDS" ]; then
-              echo "ループ終了 (${elapsed}秒)"
+              echo "ループ終了 (${elapsed}秒) — 次の run に引き継ぐ"
               break
             fi
             sleep "$INTERVAL_SECONDS"
