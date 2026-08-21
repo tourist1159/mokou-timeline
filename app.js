@@ -5,7 +5,8 @@ const CONFIG = {
   sources: {
     youtube: "https://tourist1159.github.io/youtube-comment-fetcher/youtube_archives.json",
     kick: "https://tourist1159.github.io/kick-comment-fetcher/kick_archives.json",
-    // 同一オリジン (このサイト自身が5分間隔で更新・公開する)
+    twitch: "https://tourist1159.github.io/twitch-archive-fetcher/twitch_archives.json",
+    // 同一オリジン (このサイト自身が1分間隔で更新・公開する)
     liveStatus: "live_status.json",
   },
   // チャンネル表示名（フィルタチップ・カードのバッジ用）
@@ -13,9 +14,10 @@ const CONFIG = {
     mokouliszt: "もこう",
     mokoustream: "mokoustream",
     mokoutoaruotoko: "Kick本配信",
+    mokouliszt1: "Twitch配信",
   },
   // チャンネルフィルタに並べる順
-  channelOrder: ["mokouliszt", "mokoustream", "mokoutoaruotoko"],
+  channelOrder: ["mokouliszt", "mokoustream", "mokoutoaruotoko", "mokouliszt1"],
 };
 
 /* ===== 状態 ===== */
@@ -48,6 +50,9 @@ function normalizeText(t) {
 }
 function channelLabel(ch) {
   return CONFIG.channelLabels[ch] || ch;
+}
+function platformLabel(p) {
+  return p === "youtube" ? "YouTube" : p === "kick" ? "Kick" : "Twitch";
 }
 
 /* ===== 正規化 ===== */
@@ -88,6 +93,24 @@ function normalizeKick(arr) {
     commentsKey: v.id,
   }));
 }
+function normalizeTwitch(arr) {
+  return arr.map((v) => ({
+    platform: "twitch",
+    channel: "mokouliszt1",
+    type: "stream", // Twitch アーカイブ(type=archive)は全て過去配信
+    title: v.title || "",
+    url: v.url || `https://www.twitch.tv/videos/${v.id}`,
+    videoId: v.id,
+    start: new Date(v.start_time),
+    durationSec: v.duration || 0,
+    lengthStr: "",
+    comments: null, // コメント流量グラフは未対応 (VOD一覧表示のみ)
+    // Twitch も一定期間でVODを削除する。削除済みはサムネも失われるため null → プレースホルダー
+    thumbnail: v.thumbnail || null,
+    available: v.available !== false,
+    commentsKey: null,
+  }));
+}
 
 /* ===== 取得 ===== */
 async function loadData() {
@@ -100,9 +123,13 @@ async function loadData() {
       if (!r.ok) throw new Error("Kick JSON HTTP " + r.status);
       return r.json();
     }),
-    // ライブ状態は無くても致命的でない (5分間隔更新の付加情報) ので、
+    fetch(CONFIG.sources.twitch, { cache: "no-cache" }).then((r) => {
+      if (!r.ok) throw new Error("Twitch JSON HTTP " + r.status);
+      return r.json();
+    }),
+    // ライブ状態は無くても致命的でない (1分間隔更新の付加情報) ので、
     // 失敗しても "failed" 扱いにはせず静かに空配列のままにする。
-    fetch(CONFIG.sources.liveStatus, { cache: "no-cache" }).then((r) => {
+    fetch(liveStatusUrl(), { cache: "no-cache" }).then((r) => {
       if (!r.ok) throw new Error("live_status.json HTTP " + r.status);
       return r.json();
     }),
@@ -114,7 +141,9 @@ async function loadData() {
   else failed.push("YouTube");
   if (results[1].status === "fulfilled") items.push(...normalizeKick(results[1].value));
   else failed.push("Kick");
-  LIVE = results[2].status === "fulfilled" ? (results[2].value.live || []) : [];
+  if (results[2].status === "fulfilled") items.push(...normalizeTwitch(results[2].value));
+  else failed.push("Twitch");
+  LIVE = results[3].status === "fulfilled" ? (results[3].value.live || []) : [];
 
   // 不正エントリ（日時なし等）を除外
   ALL = items.filter((x) => x.start && !isNaN(x.start) && x.title && x.url);
@@ -162,7 +191,7 @@ function makeThumb(item) {
 
   const badge = document.createElement("span");
   badge.className = "badge-platform " + item.platform;
-  badge.textContent = item.platform === "youtube" ? "YouTube" : "Kick";
+  badge.textContent = platformLabel(item.platform);
   wrap.appendChild(badge);
 
   const dur = document.createElement("span");
@@ -291,7 +320,7 @@ function makeLiveCard(item) {
   meta.className = "live-meta";
   const platformSpan = document.createElement("span");
   platformSpan.className = "badge-platform " + item.platform;
-  platformSpan.textContent = item.platform === "youtube" ? "YouTube" : "Kick";
+  platformSpan.textContent = platformLabel(item.platform);
   meta.appendChild(platformSpan);
   const chSpan = document.createElement("span");
   chSpan.textContent = channelLabel(item.channel);
@@ -320,9 +349,15 @@ function renderLiveBanner() {
   el.appendChild(frag);
 }
 
+// GitHub Pages は CDN(Fastly)側でも数分キャッシュされるため、cache:"no-cache" だけでは
+// 古い live_status.json を掴まされることがある。クエリを毎回変えてキャッシュキーをずらす。
+function liveStatusUrl() {
+  return `${CONFIG.sources.liveStatus}?t=${Date.now()}`;
+}
+
 async function refreshLiveStatus() {
   try {
-    const r = await fetch(CONFIG.sources.liveStatus, { cache: "no-cache" });
+    const r = await fetch(liveStatusUrl(), { cache: "no-cache" });
     if (!r.ok) return;
     const data = await r.json();
     LIVE = data.live || [];
@@ -350,6 +385,7 @@ function render() {
 function updateStats(shown) {
   const yt = ALL.filter((x) => x.platform === "youtube").length;
   const kk = ALL.filter((x) => x.platform === "kick").length;
+  const tw = ALL.filter((x) => x.platform === "twitch").length;
   const streams = ALL.filter((x) => x.type === "stream").length;
   const videos = ALL.filter((x) => x.type === "video").length;
   const dates = ALL.map((x) => x.start).sort((a, b) => a - b);
@@ -363,7 +399,7 @@ function updateStats(shown) {
   };
   const gone = ALL.filter((x) => !x.available).length;
   add(`表示 <b>${shown}</b> / 全 <b>${ALL.length}</b> 件`);
-  add(`YouTube <b>${yt}</b>・Kick <b>${kk}</b>`);
+  add(`YouTube <b>${yt}</b>・Kick <b>${kk}</b>・Twitch <b>${tw}</b>`);
   add(`配信 <b>${streams}</b>・動画 <b>${videos}</b>`);
   if (gone) add(`視聴可 <b>${ALL.length - gone}</b>・削除済み <b>${gone}</b>`);
   if (range) add(`期間 <b>${range}</b>`);
@@ -475,10 +511,11 @@ async function main() {
 
   const foot = document.getElementById("footer-note");
   foot.textContent =
-    "データ源: youtube-comment-fetcher / kick-comment-fetcher（GitHub Pages）。読み込み時に最新を取得します。";
+    "データ源: youtube-comment-fetcher / kick-comment-fetcher / twitch-archive-fetcher（GitHub Pages）。読み込み時に最新を取得します。";
 
-  // ライブ配信中の状態は定期的にポーリングして更新する (軽量な live_status.json のみ再取得)
-  setInterval(refreshLiveStatus, 60000);
+  // ライブ配信中の状態は定期的にポーリングして更新する (軽量な live_status.json のみ再取得)。
+  // サーバ側(Actions)が1分おきに更新するので、こちらは30秒間隔で追従する。
+  setInterval(refreshLiveStatus, 30000);
 }
 
 main();

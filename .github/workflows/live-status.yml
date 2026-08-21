@@ -2,8 +2,9 @@ name: Live Status Checker
 
 on:
   schedule:
-    # GitHub Actions cron の最小粒度(5分)で実行。実際の発火は GitHub 側の負荷で
-    # 多少遅れることがある("best effort")。
+    # cron の最小粒度は5分なので、発火自体は "*/5"。実際の検知間隔は1分にするため、
+    # 1回の run のなかで check_live.py を1分おきに繰り返し実行する (下の Check live status)。
+    # 発火は GitHub 側の負荷で多少遅れることがある("best effort")。
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
@@ -12,12 +13,15 @@ permissions:
 
 concurrency:
   group: live-status
+  # 次の run が始まったら古い run は打ち切る。cron が遅れても、古い run が
+  # そのあいだループを続けているので検知の隙間ができない。
   cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # ループ(5分半)+セットアップぶんの余裕。ハングしても次の run が引き継ぐ。
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -30,18 +34,32 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Check live status
-        run: python check_live.py
-
-      - name: Commit and push if changed
+      - name: Check live status (1分おきにループ)
+        env:
+          # 次の cron 発火(5分後)と少し重なる長さまで回す。重なったぶんは
+          # concurrency の cancel-in-progress で解消される。
+          LOOP_SECONDS: "330"
+          INTERVAL_SECONDS: "60"
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add live_status.json
-          if git diff --cached --quiet; then
-            echo "変化なし"
-            exit 0
-          fi
-          git commit -m "Update live status [skip ci]"
-          git pull --rebase
-          git push
+          start=$SECONDS
+          while :; do
+            python check_live.py
+            git add live_status.json
+            if git diff --cached --quiet; then
+              echo "変化なし (commit せず)"
+            else
+              git commit -m "Update live status [skip ci]"
+              git pull --rebase
+              git push
+            fi
+            elapsed=$(( SECONDS - start ))
+            if [ "$elapsed" -ge "$LOOP_SECONDS" ]; then
+              echo "ループ終了 (${elapsed}秒)"
+              break
+            fi
+            sleep "$INTERVAL_SECONDS"
+          done

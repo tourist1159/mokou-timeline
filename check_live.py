@@ -7,9 +7,17 @@ YouTube (2チャンネル) / Kick が現在ライブ配信中かどうかを調�
   ページ取得なので、GitHub Actions のデータセンターIPでも bot 判定されにくい。
 - Kick: https://kick.com/api/v2/channels/<slug> の `livestream` フィールドを見る
   (配信中はオブジェクト、非配信時は null。実測で確認済み)。
+- Twitch: Helix API の `GET /helix/streams?user_login=<login>` を見る (配信中は
+  data が非空、非配信時は空配列)。App Access Token (Client Credentials Flow) が要る
+  ので TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET を環境変数(Secrets)で渡す。未設定でも
+  他プラットフォームの判定は継続する(静かにスキップ)。
 
-このスクリプトは mokou-timeline 内で完結させる (5分間隔などの頻繁な実行が必要なため、
+このスクリプトは mokou-timeline 内で完結させる (1分間隔などの頻繁な実行が必要なため、
 アーカイブ収集用の各fetcherリポジトリとは別に、時系列サイト自身が「今」の状態を持つ)。
+
+Actions からは 1 run のなかで 1 分おきに繰り返し呼ばれる (cron の最小粒度が5分のため)。
+そのため「変化が無いときは live_status.json を書き換えない」= commit/push しない、という
+挙動にしてある (下の should_write を参照)。
 """
 
 import json
@@ -20,6 +28,7 @@ import html as html_module
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 
 print = functools.partial(print, file=sys.stderr, flush=True)
 
@@ -33,8 +42,14 @@ YOUTUBE_CHANNELS = [
     {"handle": "mokoustream", "channel_id": "UCENoC6MLc4pL-vehJyzSWmg"},
 ]
 KICK_CHANNEL = "mokoutoaruotoko"
+TWITCH_CHANNEL = "mokouliszt1"
 
 OUT_FILE = "live_status.json"
+
+# 変化が無いのに書き換えると毎分 commit/push が走ってしまうので、状態が同じあいだは
+# ファイルに触らない。ただし完全に止めると「最後にいつ確認できたか」が分からなくなるため、
+# この秒数以上経っていれば checked_at だけの更新でも書き出す (死活確認用の heartbeat)。
+HEARTBEAT_SECONDS = 900
 
 CANONICAL_RE = re.compile(r'<link rel="canonical" href="([^"]+)"')
 # 実測の結果、/channel/<id>/live には og:title/og:image が無く、
@@ -126,6 +141,86 @@ def check_kick_live():
     }
 
 
+def get_twitch_app_token():
+    client_id = os.environ.get("TWITCH_CLIENT_ID")
+    client_secret = os.environ.get("TWITCH_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return None
+    body = urlencode(
+        {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "client_credentials",
+        }
+    ).encode()
+    req = Request("https://id.twitch.tv/oauth2/token", data=body, method="POST")
+    try:
+        with urlopen(req, timeout=20) as res:
+            return json.loads(res.read().decode("utf-8"))["access_token"]
+    except (HTTPError, URLError) as e:
+        print(f"[twitch] トークン取得エラー: {e}")
+        return None
+
+
+def check_twitch_live():
+    client_id = os.environ.get("TWITCH_CLIENT_ID")
+    token = get_twitch_app_token()
+    if not client_id or not token:
+        return None  # Secret未設定でも他プラットフォームは動かす
+
+    url = f"https://api.twitch.tv/helix/streams?user_login={TWITCH_CHANNEL}"
+    try:
+        body = fetch(url, headers={"Client-Id": client_id, "Authorization": f"Bearer {token}"})
+        data = json.loads(body).get("data") or []
+    except (HTTPError, URLError) as e:
+        print(f"[twitch] 取得エラー: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"[twitch] JSON解析エラー: {e}")
+        return None
+
+    if not data:
+        return None  # ライブ中でない
+
+    s = data[0]
+    thumbnail = (s.get("thumbnail_url") or "").replace("%{width}", "320").replace("%{height}", "180")
+
+    return {
+        "platform": "twitch",
+        "channel": TWITCH_CHANNEL,
+        "title": s.get("title") or "配信中",
+        "url": f"https://www.twitch.tv/{TWITCH_CHANNEL}",
+        "thumbnail": thumbnail or None,
+        "viewers": s.get("viewer_count"),
+    }
+
+
+def load_previous():
+    try:
+        with open(OUT_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def should_write(prev, live):
+    """live_status.json を書き出すべきか (書く理由) を返す。"""
+    if not isinstance(prev, dict):
+        return True, "既存ファイル無し"
+    if prev.get("live") != live:
+        return True, "ライブ状態が変化"
+    try:
+        prev_at = datetime.fromisoformat(prev["checked_at"])
+    except (KeyError, TypeError, ValueError):
+        return True, "checked_at が不正"
+    if prev_at.tzinfo is None:
+        prev_at = prev_at.replace(tzinfo=timezone.utc)
+    age = int((datetime.now(timezone.utc) - prev_at).total_seconds())
+    if age >= HEARTBEAT_SECONDS:
+        return True, f"heartbeat ({age}秒経過)"
+    return False, "変化なし"
+
+
 def main():
     live = []
     for ch in YOUTUBE_CHANNELS:
@@ -139,10 +234,20 @@ def main():
         live.append(k)
         print(f"[kick] ライブ中: {k['title'][:40]}")
 
+    t = check_twitch_live()
+    if t:
+        live.append(t)
+        print(f"[twitch] ライブ中: {t['title'][:40]}")
+
+    write, reason = should_write(load_previous(), live)
+    if not write:
+        print(f"⏭ {OUT_FILE} 据え置き ({reason} / ライブ中: {len(live)} 件)")
+        return
+
     out = {"checked_at": datetime.now(timezone.utc).isoformat(), "live": live}
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print(f"📁 {OUT_FILE} 更新完了 (ライブ中: {len(live)} 件)")
+    print(f"📁 {OUT_FILE} 更新完了 ({reason} / ライブ中: {len(live)} 件)")
 
 
 if __name__ == "__main__":

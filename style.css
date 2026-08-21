@@ -7,6 +7,7 @@
   --text-dim: #aaaaaa;
   --yt: #ff3d3d;
   --kick: #53fc18;
+  --twitch: #9146ff;
   --accent: #3ea6ff;
   --radius: 12px;
 }
@@ -172,6 +173,7 @@ body {
 }
 .badge-platform.youtube { background: var(--yt); }
 .badge-platform.kick { background: var(--kick); color: #0f0f0f; }
+.badge-platform.twitch { background: var(--twitch); }
 .graph-btn {
   margin-left: auto;
   flex: 0 0 auto;

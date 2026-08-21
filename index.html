@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>もこう アーカイブタイムライン</title>
-  <meta name="description" content="もこうの YouTube 動画・配信と Kick 配信を時系列でまとめて表示" />
-  <link rel="stylesheet" href="style.css?v=7" />
+  <meta name="description" content="もこうの YouTube 動画・配信、Kick 配信、Twitch 配信を時系列でまとめて表示" />
+  <link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
   <header class="site-header">
     <h1>もこう アーカイブタイムライン</h1>
-    <p class="tagline">YouTube の動画・配信と Kick の配信を、まとめて時系列で。</p>
+    <p class="tagline">YouTube の動画・配信、Kick・Twitch の配信を、まとめて時系列で。</p>
     <div id="stats" class="stats"></div>
   </header>
 
@@ -22,6 +22,7 @@
       <button class="chip active" data-value="all">すべて</button>
       <button class="chip" data-value="youtube">YouTube</button>
       <button class="chip" data-value="kick">Kick</button>
+      <button class="chip" data-value="twitch">Twitch</button>
     </div>
 
     <div class="control-group" id="filter-channel" data-key="channel">
@@ -62,7 +63,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
   <script src="commentgraph.js?v=7"></script>
 </body>
 </html>
