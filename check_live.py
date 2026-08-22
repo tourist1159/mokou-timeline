@@ -12,6 +12,18 @@ YouTube (2チャンネル) / Kick が現在ライブ配信中かどうかを調�
   ので TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET を環境変数(Secrets)で渡す。未設定でも
   他プラットフォームの判定は継続する(静かにスキップ)。
 
+さらに、このスクリプトは「配信終了」を検知した瞬間に対応するアーカイブ収集リポジトリの
+Actions を workflow_dispatch で起動する (dispatch_ended_streams 以下)。各アーカイブ収集は
+毎時cronで独自にも動くが、それだと配信終了から最大1時間待たされる。ここは1分間隔で回って
+いる (live-status.yml) ので、終了検知からすぐ収集を始められる。GitHub REST API を叩くのに
+DISPATCH_PAT (対象repoへの Actions:write 権限を持つ PAT) が要る。未設定でも通常のライブ
+判定自体は継続する(起動だけ諦める)。
+  - Kick 終了 → kick-comment-fetcher の fetch.yml
+  - Twitch 終了 → twitch-archive-fetcher の fetch.yml
+  - YouTube 終了 (どちらかのチャンネル) → youtube-comment-fetcher の meta-fetch.yml
+    (コメント取得本体は bot判定回避のためローカル専用なのでここでは起動しない。
+    メタ情報だけでも早く反映されれば、タイムラインにはタイトル・サムネがすぐ出る)
+
 このスクリプトは mokou-timeline 内で完結させる (1分間隔などの頻繁な実行が必要なため、
 アーカイブ収集用の各fetcherリポジトリとは別に、時系列サイト自身が「今」の状態を持つ)。
 
@@ -46,6 +58,15 @@ KICK_CHANNEL = "mokoutoaruotoko"
 TWITCH_CHANNEL = "mokouliszt1"
 
 OUT_FILE = "live_status.json"
+
+# 配信終了検知 → 起動するアーカイブ収集repoの対応表 (platform, channel) -> (repo, workflow_file)
+GITHUB_OWNER = "tourist1159"
+DISPATCH_TARGETS = {
+    ("kick", KICK_CHANNEL): ("kick-comment-fetcher", "fetch.yml"),
+    ("twitch", TWITCH_CHANNEL): ("twitch-archive-fetcher", "fetch.yml"),
+    ("youtube", "mokouliszt"): ("youtube-comment-fetcher", "meta-fetch.yml"),
+    ("youtube", "mokoustream"): ("youtube-comment-fetcher", "meta-fetch.yml"),
+}
 
 # 変化が無いのに書き換えると毎分 commit/push が走ってしまうので、状態が同じあいだは
 # ファイルに触らない。ただし完全に止めると「最後にいつ確認できたか」が分からなくなるため、
@@ -196,6 +217,57 @@ def check_twitch_live():
     }
 
 
+def detect_ended(prev_live, live):
+    """直前は配信中だったが今回は配信中でなくなった (platform, channel) の集合を返す。
+
+    注意: check_xxx_live() は「配信中でない」と「取得エラー」を区別せず両方 None を
+    返すため、一時的な通信エラーでも誤って「終了」判定される可能性がある。実害は
+    アーカイブ収集を少し早めに起動するだけ(収集側は差分が無ければ何もしない)なので、
+    ここでは簡易な判定のまま許容している。
+    """
+    prev_keys = {(x.get("platform"), x.get("channel")) for x in (prev_live or [])}
+    now_keys = {(x.get("platform"), x.get("channel")) for x in live}
+    return prev_keys - now_keys
+
+
+def dispatch_workflow(repo, workflow_file):
+    pat = os.environ.get("DISPATCH_PAT")
+    if not pat:
+        print(f"⚠️ DISPATCH_PAT 未設定のため {repo}/{workflow_file} を起動できません (次回の定期実行を待ちます)")
+        return
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{repo}/actions/workflows/{workflow_file}/dispatches"
+    body = json.dumps({"ref": "main"}).encode("utf-8")
+    req = Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {pat}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=20) as res:
+            print(f"🚀 {repo}/{workflow_file} を起動 (HTTP {res.status})")
+    except HTTPError as e:
+        print(f"❌ {repo}/{workflow_file} の起動に失敗: HTTP {e.code} {e.read().decode('utf-8', 'replace')}")
+    except URLError as e:
+        print(f"❌ {repo}/{workflow_file} の起動に失敗: {e.reason}")
+
+
+def dispatch_ended_streams(prev_live, live):
+    ended = detect_ended(prev_live, live)
+    if not ended:
+        return
+    targets = {DISPATCH_TARGETS[k] for k in ended if k in DISPATCH_TARGETS}
+    for platform, channel in ended:
+        print(f"🔚 [{platform}/{channel}] 配信終了を検知")
+    for repo, workflow_file in targets:
+        dispatch_workflow(repo, workflow_file)
+
+
 def load_previous():
     try:
         with open(OUT_FILE, encoding="utf-8") as f:
@@ -223,6 +295,9 @@ def should_write(prev, live):
 
 
 def main():
+    prev = load_previous()
+    prev_live = prev.get("live") if isinstance(prev, dict) else None
+
     live = []
     for ch in YOUTUBE_CHANNELS:
         r = check_youtube_live(ch["channel_id"], ch["handle"])
@@ -240,7 +315,9 @@ def main():
         live.append(t)
         print(f"[twitch] ライブ中: {t['title'][:40]}")
 
-    write, reason = should_write(load_previous(), live)
+    dispatch_ended_streams(prev_live, live)
+
+    write, reason = should_write(prev, live)
     if not write:
         print(f"⏭ {OUT_FILE} 据え置き ({reason} / ライブ中: {len(live)} 件)")
         return

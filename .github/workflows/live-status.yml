@@ -45,6 +45,9 @@ jobs:
           INTERVAL_SECONDS: "60"
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          # 配信終了検知時に kick-comment-fetcher / twitch-archive-fetcher /
+          # youtube-comment-fetcher の Actions を起動するための PAT (Actions:write権限、対象3repoに限定推奨)
+          DISPATCH_PAT: ${{ secrets.DISPATCH_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
