@@ -523,6 +523,16 @@ function render() {
 
   empty.hidden = list.length > 0;
   updateStats(list.length);
+  syncPrimaryOffset();
+}
+
+// モバイルでは .controls-primary が position:fixed (デスクトップでは display:contents
+// で本来ボックスを持たないため offsetHeight は常に0、つまりここは実質ノーオペになる)。
+// フローから外れた分、直後の .controls-secondary が隠れないよう高さぶんの余白を付ける。
+function syncPrimaryOffset() {
+  const primary = document.querySelector(".controls-primary");
+  const secondary = document.querySelector(".controls-secondary");
+  secondary.style.marginTop = primary.offsetHeight + "px";
 }
 
 function updateStats(shown) {
@@ -700,6 +710,10 @@ async function main() {
   // ライブ配信中の状態は定期的にポーリングして更新する (軽量な live_status.json のみ再取得)。
   // サーバ側(Actions)が1分おきに更新するので、こちらは30秒間隔で追従する。
   setInterval(refreshLiveStatus, 30000);
+
+  // 画面回転・リサイズで .controls-primary の折り返し行数が変わることがあるため、
+  // その都度オフセットを再計算する (fixed化した高さぶんの余白の再調整)。
+  window.addEventListener("resize", syncPrimaryOffset);
 }
 
 main();

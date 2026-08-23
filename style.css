@@ -63,6 +63,11 @@ body {
   max-width: 1400px;
   margin: 0 auto;
 }
+/* デスクトップでは箱を作らず、中の .control-group がそのまま .controls の
+   flex-wrap に直接並ぶ (分割前と見た目が変わらないようにするため)。 */
+.controls-primary, .controls-secondary {
+  display: contents;
+}
 .control-group {
   display: flex;
   align-items: center;
@@ -486,6 +491,47 @@ body {
   .date-group { flex-direction: column; gap: 6px; }
   .date-label { width: auto; padding-top: 0; }
   .settings-panel { width: 200px; }
+
+  /* スクロール追従は配信元・種別 (controls-primary) だけにする。
+     チャンネル・並び・検索・表示設定 (controls-secondary) は追従させず素通りさせる。 */
+  .controls {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+    border-bottom: none;
+    gap: 0;
+  }
+  .controls-primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    /* position:sticky だと「親要素(.controls)の高さぶんしか追従できない」制約に
+       引っかかる(.controls は primary+secondary を足しても短く、grid は兄弟要素で
+       高さに含まれないため)。position:fixed ならその制約を受けずページ全体で追従する。
+       その代わりフローから外れるので、直後の .controls-secondary 側に JS で
+       (syncPrimaryOffset) このバーの高さぶんの余白を付けて隠れないようにしている。 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: rgba(15, 15, 15, 0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  .controls-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 /* ---- Live now banner ---- */

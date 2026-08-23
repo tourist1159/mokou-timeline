@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>もこう アーカイブタイムライン</title>
   <meta name="description" content="もこうの YouTube 動画・配信、Kick 配信、Twitch 配信を時系列でまとめて表示" />
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=11" />
 </head>
 <body>
   <header class="site-header">
@@ -17,54 +17,60 @@
   <div id="live-banner" class="live-banner" hidden></div>
 
   <div class="controls">
-    <div class="control-group" id="filter-platform" data-key="platform">
-      <span class="control-label">配信元</span>
-      <button class="chip active" data-value="all">すべて</button>
-      <button class="chip" data-value="youtube">YouTube</button>
-      <button class="chip" data-value="kick">Kick</button>
-      <button class="chip" data-value="twitch">Twitch</button>
+    <!-- モバイルでは controls-primary だけスクロール追従させる (controls-secondary は追従しない)。
+         デスクトップでは display:contents になり、見た目は分割前と同じ1つの並びになる。 -->
+    <div class="controls-primary">
+      <div class="control-group" id="filter-platform" data-key="platform">
+        <span class="control-label">配信元</span>
+        <button class="chip active" data-value="all">すべて</button>
+        <button class="chip" data-value="youtube">YouTube</button>
+        <button class="chip" data-value="kick">Kick</button>
+        <button class="chip" data-value="twitch">Twitch</button>
+      </div>
+
+      <div class="control-group" id="filter-type" data-key="type">
+        <span class="control-label">種別</span>
+        <button class="chip active" data-value="all">すべて</button>
+        <button class="chip" data-value="stream">配信</button>
+        <button class="chip" data-value="video">動画</button>
+      </div>
     </div>
 
-    <div class="control-group" id="filter-channel" data-key="channel">
-      <span class="control-label">チャンネル</span>
-      <button class="chip active" data-value="all">すべて</button>
-      <!-- チャンネルのチップは app.js が動的に追加 -->
-    </div>
+    <div class="controls-secondary">
+      <div class="control-group" id="filter-channel" data-key="channel">
+        <span class="control-label">チャンネル</span>
+        <button class="chip active" data-value="all">すべて</button>
+        <!-- チャンネルのチップは app.js が動的に追加 -->
+      </div>
 
-    <div class="control-group" id="filter-type" data-key="type">
-      <span class="control-label">種別</span>
-      <button class="chip active" data-value="all">すべて</button>
-      <button class="chip" data-value="stream">配信</button>
-      <button class="chip" data-value="video">動画</button>
-    </div>
+      <div class="control-group">
+        <span class="control-label">並び</span>
+        <button class="chip active" id="sort-toggle" data-order="desc">新しい順</button>
+      </div>
 
-    <div class="control-group">
-      <span class="control-label">並び</span>
-      <button class="chip active" id="sort-toggle" data-order="desc">新しい順</button>
-    </div>
+      <div class="control-group search-group">
+        <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
+      </div>
 
-    <div class="control-group search-group">
-      <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
-    </div>
-
-    <div class="control-group settings-group">
-      <button class="settings-btn" id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">⚙️ 表示設定</button>
-      <div class="settings-panel" id="settings-panel" hidden>
-        <div class="settings-row">
-          <span class="control-label">表示形式</span>
-          <div class="control-group" id="view-toggle" data-key="view">
-            <button class="chip active" data-value="grid">グリッド</button>
-            <button class="chip" data-value="list">リスト</button>
+      <div class="control-group settings-group">
+        <button class="settings-btn" id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">⚙️ 表示設定</button>
+        <div class="settings-panel" id="settings-panel" hidden>
+          <div class="settings-row">
+            <span class="control-label">表示形式</span>
+            <div class="control-group" id="view-toggle" data-key="view">
+              <button class="chip active" data-value="grid">グリッド</button>
+              <button class="chip" data-value="list">リスト</button>
+            </div>
           </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="toggle-timeline" />
+            左に時間軸を表示
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="toggle-newmarker" />
+            新着の境界線を表示
+          </label>
         </div>
-        <label class="settings-toggle">
-          <input type="checkbox" id="toggle-timeline" />
-          左に時間軸を表示
-        </label>
-        <label class="settings-toggle">
-          <input type="checkbox" id="toggle-newmarker" />
-          新着の境界線を表示
-        </label>
       </div>
     </div>
   </div>
@@ -78,7 +84,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
   <script src="commentgraph.js?v=7"></script>
 </body>
 </html>
