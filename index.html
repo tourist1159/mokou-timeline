@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>もこう アーカイブタイムライン</title>
   <meta name="description" content="もこうの YouTube 動画・配信、Kick 配信、Twitch 配信を時系列でまとめて表示" />
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
   <header class="site-header">
@@ -38,12 +38,6 @@
       <button class="chip" data-value="video">動画</button>
     </div>
 
-    <div class="control-group" id="view-toggle" data-key="view">
-      <span class="control-label">表示</span>
-      <button class="chip active" data-value="grid">グリッド</button>
-      <button class="chip" data-value="list">リスト</button>
-    </div>
-
     <div class="control-group">
       <span class="control-label">並び</span>
       <button class="chip active" id="sort-toggle" data-order="desc">新しい順</button>
@@ -51,6 +45,27 @@
 
     <div class="control-group search-group">
       <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
+    </div>
+
+    <div class="control-group settings-group">
+      <button class="settings-btn" id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">⚙️ 表示設定</button>
+      <div class="settings-panel" id="settings-panel" hidden>
+        <div class="settings-row">
+          <span class="control-label">表示形式</span>
+          <div class="control-group" id="view-toggle" data-key="view">
+            <button class="chip active" data-value="grid">グリッド</button>
+            <button class="chip" data-value="list">リスト</button>
+          </div>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="toggle-timeline" />
+          左に時間軸を表示
+        </label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="toggle-newmarker" />
+          新着の境界線を表示
+        </label>
+      </div>
     </div>
   </div>
 
@@ -63,7 +78,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
   <script src="commentgraph.js?v=7"></script>
 </body>
 </html>

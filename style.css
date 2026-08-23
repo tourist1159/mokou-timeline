@@ -94,6 +94,47 @@ body {
   font-weight: 600;
 }
 .search-group { flex: 1 1 200px; justify-content: flex-end; }
+
+/* ---- 表示設定パネル ---- */
+.settings-group { position: relative; }
+.settings-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.settings-btn:hover { background: var(--surface-2); }
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.settings-panel[hidden] { display: none; }
+.settings-row { display: flex; flex-direction: column; gap: 6px; }
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.83rem;
+  cursor: pointer;
+}
+.settings-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
 #search {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -118,6 +159,53 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 18px;
+}
+
+/* 新着境界線 (グリッド/リストどちらでもフル幅で表示) */
+.new-marker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ff6b6b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.grid > .new-marker,
+.date-items.view-grid > .new-marker { grid-column: 1 / -1; }
+.new-marker-line { flex: 1; height: 1px; background: currentColor; opacity: 0.5; }
+
+/* ---- 時間軸 (左に日付ラベル) ---- */
+#grid.with-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.date-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.date-label {
+  flex: 0 0 76px;
+  width: 76px;
+  padding-top: 2px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.date-items { min-width: 0; }
+.date-items.view-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px;
+}
+.date-items.view-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .card {
@@ -387,6 +475,13 @@ body {
   .card-title { font-size: 0.82rem; }
   #grid.view-list .thumb { flex: 0 0 120px; width: 120px; }
   #grid.view-list .card-body { padding: 6px 10px; }
+  .date-items.view-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .date-items.view-list .thumb { flex: 0 0 120px; width: 120px; }
+  .date-items.view-list .card-body { padding: 6px 10px; }
+  /* 狭い画面では日付ラベルを上に横並びで置く (左に幅を割くと窮屈なため) */
+  .date-group { flex-direction: column; gap: 6px; }
+  .date-label { width: auto; padding-top: 0; }
+  .settings-panel { width: 200px; }
 }
 
 /* ---- Live now banner ---- */

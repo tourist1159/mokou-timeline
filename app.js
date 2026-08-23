@@ -23,7 +23,61 @@ const CONFIG = {
 /* ===== 状態 ===== */
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
-const state = { platform: "all", channel: "all", type: "all", order: "desc", q: "", view: "grid" };
+// view/timeline/newMarker は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
+const state = {
+  platform: "all", channel: "all", type: "all", order: "desc", q: "",
+  view: "grid", timeline: true, newMarker: true,
+};
+
+/* ===== 表示設定 (localStorage) ===== */
+const SETTINGS_KEY = "mokou-timeline:settings";
+const DEFAULT_SETTINGS = { view: "grid", timeline: true, newMarker: true };
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_SETTINGS };
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch (e) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ view: state.view, timeline: state.timeline, newMarker: state.newMarker })
+    );
+  } catch (e) {
+    // プライベートブラウジング等で localStorage が使えない場合は諦める(機能はセッション内のみ動作)
+  }
+}
+
+/* ===== 新着判定 (localStorage) =====
+ * 前回訪問時に見えていたアイテムのIDを保存しておき、今回無かったものを「新着」とする。
+ * 初回訪問(保存が無い)は比較対象が無いので全件「新着でない」扱いにする。 */
+const SEEN_KEY = "mokou-timeline:seenIds";
+
+function itemId(item) {
+  return `${item.platform}:${item.videoId}`;
+}
+function loadSeenIds() {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw)) : null;
+  } catch (e) {
+    return null;
+  }
+}
+function markNewItems() {
+  const seen = loadSeenIds();
+  for (const item of ALL) item.isNew = seen ? !seen.has(itemId(item)) : false;
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify(ALL.map(itemId)));
+  } catch (e) {
+    // 保存できなくても表示自体は継続する
+  }
+}
 
 /* ===== ユーティリティ ===== */
 const dateFmt = new Intl.DateTimeFormat("ja-JP", {
@@ -35,6 +89,21 @@ function fmtDate(d) {
 }
 function fmtDateOnly(d) {
   return d && !isNaN(d) ? d.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "";
+}
+// JST基準の日付キー "YYYY-MM-DD"。訪問者のブラウザのタイムゾーンに関わらず日本時間で揃える。
+function jstDateKey(d) {
+  return d.toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+}
+const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"];
+function timelineLabel(d) {
+  const key = jstDateKey(d);
+  const now = new Date();
+  if (key === jstDateKey(now)) return "今日";
+  if (key === jstDateKey(new Date(now.getTime() - 86400000))) return "昨日";
+  const [, m, day] = key.split("-").map(Number);
+  // JSTの00:00固定でDateを作り、ブラウザのローカルタイムゾーンによる曜日ズレを防ぐ
+  const wd = WEEKDAY_JA[new Date(`${key}T00:00:00+09:00`).getDay()];
+  return `${m}/${day}(${wd})`;
 }
 function fmtDuration(sec, lengthStr) {
   if (lengthStr) return lengthStr;
@@ -367,15 +436,89 @@ async function refreshLiveStatus() {
   }
 }
 
+function makeNewMarker() {
+  const el = document.createElement("div");
+  el.className = "new-marker";
+  el.innerHTML = '<span class="new-marker-line"></span><span>新着</span><span class="new-marker-line"></span>';
+  return el;
+}
+
+// 現在の並び順(state.order)における「新着アイテムの並び」から抜けた直後のインデックスを返す。
+// 新着は日付順に並んだ結果、常にどちらかの端に固まる想定 (降順なら先頭、昇順なら末尾)。
+// 端から連続していない場合や、全件新着/新着0件の場合は表示しない(-1)。
+function computeNewBoundary(list) {
+  if (!state.newMarker || !list.length) return -1;
+  if (state.order === "desc") {
+    let i = 0;
+    while (i < list.length && list[i].isNew) i++;
+    return i > 0 && i < list.length ? i : -1;
+  }
+  let i = list.length;
+  while (i > 0 && list[i - 1].isNew) i--;
+  return i > 0 && i < list.length ? i : -1;
+}
+
+function groupByDate(list) {
+  const groups = [];
+  let current = null;
+  for (const item of list) {
+    const key = jstDateKey(item.start);
+    if (!current || current.key !== key) {
+      current = { key, label: timelineLabel(item.start), items: [] };
+      groups.push(current);
+    }
+    current.items.push(item);
+  }
+  return groups;
+}
+
+function renderFlat(list, boundary, frag) {
+  list.forEach((item, i) => {
+    if (i === boundary) frag.appendChild(makeNewMarker());
+    frag.appendChild(makeCard(item));
+  });
+}
+
+function renderWithTimeline(list, boundary, frag) {
+  let i = 0;
+  for (const group of groupByDate(list)) {
+    const section = document.createElement("section");
+    section.className = "date-group";
+
+    const label = document.createElement("div");
+    label.className = "date-label";
+    label.textContent = group.label;
+    section.appendChild(label);
+
+    const items = document.createElement("div");
+    items.className = "date-items " + (state.view === "list" ? "view-list" : "view-grid");
+    for (const item of group.items) {
+      if (i === boundary) items.appendChild(makeNewMarker());
+      items.appendChild(makeCard(item));
+      i++;
+    }
+    section.appendChild(items);
+    frag.appendChild(section);
+  }
+}
+
 function render() {
   const list = applyFilters();
   const grid = document.getElementById("grid");
   const empty = document.getElementById("empty");
-  grid.classList.toggle("view-list", state.view === "list");
+  // with-timeline時は #grid 自身ではなく内側の .date-items が grid/list を担うので、
+  // view-list クラスは timeline OFF の時だけ付ける (CSSの優先順位の衝突を避けるため)。
+  grid.classList.toggle("view-list", state.view === "list" && !state.timeline);
+  grid.classList.toggle("with-timeline", state.timeline);
   grid.textContent = "";
 
+  const boundary = computeNewBoundary(list);
   const frag = document.createDocumentFragment();
-  for (const item of list) frag.appendChild(makeCard(item));
+  if (state.timeline) {
+    renderWithTimeline(list, boundary, frag);
+  } else {
+    renderFlat(list, boundary, frag);
+  }
   grid.appendChild(frag);
 
   empty.hidden = list.length > 0;
@@ -422,7 +565,7 @@ function buildChannelChips() {
 /* ===== URL クエリ同期 ===== */
 function readQuery() {
   const p = new URLSearchParams(location.search);
-  for (const k of ["platform", "channel", "type", "order", "q", "view"]) {
+  for (const k of ["platform", "channel", "type", "order", "q"]) {
     if (p.has(k)) state[k] = p.get(k);
   }
 }
@@ -430,7 +573,6 @@ function writeQuery() {
   const p = new URLSearchParams();
   for (const k of ["platform", "channel", "type"]) if (state[k] !== "all") p.set(k, state[k]);
   if (state.order !== "desc") p.set("order", state.order);
-  if (state.view !== "grid") p.set("view", state.view);
   if (state.q) p.set("q", state.q);
   const qs = p.toString();
   history.replaceState(null, "", qs ? "?" + qs : location.pathname);
@@ -451,6 +593,12 @@ function syncChipUI() {
   document.getElementById("search").value = state.q;
 }
 
+/* ===== 表示設定パネルの見た目を状態に同期 ===== */
+function syncSettingsUI() {
+  document.getElementById("toggle-timeline").checked = state.timeline;
+  document.getElementById("toggle-newmarker").checked = state.newMarker;
+}
+
 /* ===== イベント ===== */
 function wireEvents() {
   document.querySelectorAll(".control-group[data-key]").forEach((group) => {
@@ -461,6 +609,7 @@ function wireEvents() {
       state[key] = chip.dataset.value;
       syncChipUI();
       writeQuery();
+      saveSettings();
       render();
     });
   });
@@ -479,6 +628,36 @@ function wireEvents() {
     writeQuery();
     render();
   });
+
+  document.getElementById("toggle-timeline").addEventListener("change", (e) => {
+    state.timeline = e.target.checked;
+    saveSettings();
+    render();
+  });
+  document.getElementById("toggle-newmarker").addEventListener("change", (e) => {
+    state.newMarker = e.target.checked;
+    saveSettings();
+    render();
+  });
+}
+
+/* ===== 表示設定パネルの開閉 ===== */
+function wireSettingsPanel() {
+  const btn = document.getElementById("settings-btn");
+  const panel = document.getElementById("settings-panel");
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = panel.hidden;
+    panel.hidden = !willOpen;
+    btn.setAttribute("aria-expanded", String(willOpen));
+  });
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => {
+    if (!panel.hidden) {
+      panel.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+    }
+  });
 }
 
 /* ===== 起動 ===== */
@@ -495,10 +674,15 @@ async function main() {
     return;
   }
 
+  Object.assign(state, loadSettings());
+  markNewItems();
+
   buildChannelChips();
   readQuery();
   syncChipUI();
+  syncSettingsUI();
   wireEvents();
+  wireSettingsPanel();
   renderLiveBanner();
   render();
 
