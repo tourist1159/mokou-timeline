@@ -428,19 +428,23 @@ body {
   flex-direction: column;
   gap: 10px;
 }
-#grid.view-list .card {
+#grid.view-list .card,
+.date-items.view-list .card {
   flex-direction: row;
 }
-#grid.view-list .thumb {
+#grid.view-list .thumb,
+.date-items.view-list .thumb {
   flex: 0 0 168px;
   width: 168px;
   aspect-ratio: 16 / 9;
 }
-#grid.view-list .card-body {
+#grid.view-list .card-body,
+.date-items.view-list .card-body {
   padding: 8px 14px;
   gap: 6px;
 }
-#grid.view-list .card-title {
+#grid.view-list .card-title,
+.date-items.view-list .card-title {
   -webkit-line-clamp: 2;
   min-height: 0;
   font-size: 0.95rem;
