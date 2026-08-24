@@ -490,7 +490,16 @@ body {
   /* 狭い画面では日付ラベルを上に横並びで置く (左に幅を割くと窮屈なため) */
   .date-group { flex-direction: column; gap: 6px; }
   .date-label { width: auto; padding-top: 0; }
-  .settings-panel { width: 200px; }
+  /* .settings-group はモバイルの flex-wrap で行の左寄りに折り返されることがあり、
+     right:0 (settings-group基準) のままだと画面左にはみ出して見切れる。
+     ビューポート基準の position:fixed に切り替え、top は開くたびJSで計算する
+     (wireSettingsPanel を参照)。 */
+  .settings-panel {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    width: auto;
+  }
 
   /* スクロール追従は配信元・種別 (controls-primary) だけにする。
      チャンネル・並び・検索・表示設定 (controls-secondary) は追従させず素通りさせる。 */

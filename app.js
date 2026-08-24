@@ -528,11 +528,11 @@ function render() {
 
 // モバイルでは .controls-primary が position:fixed (デスクトップでは display:contents
 // で本来ボックスを持たないため offsetHeight は常に0、つまりここは実質ノーオペになる)。
-// フローから外れた分、直後の .controls-secondary が隠れないよう高さぶんの余白を付ける。
+// フローから外れた分、body 全体を高さぶん押し下げる (site-header や controls-secondary が
+// 固定バーの下に隠れないように)。
 function syncPrimaryOffset() {
   const primary = document.querySelector(".controls-primary");
-  const secondary = document.querySelector(".controls-secondary");
-  secondary.style.marginTop = primary.offsetHeight + "px";
+  document.body.style.paddingTop = primary.offsetHeight + "px";
 }
 
 function updateStats(shown) {
@@ -660,6 +660,14 @@ function wireSettingsPanel() {
     const willOpen = panel.hidden;
     panel.hidden = !willOpen;
     btn.setAttribute("aria-expanded", String(willOpen));
+    // モバイルは position:fixed (ビューポート基準) なので、ボタンの実際の位置から
+    // 毎回 top を計算する。.settings-group がその行の左寄りに折り返されて right:0
+    // 基準だと画面外にはみ出すことがあるため (CSS側は left/right をビューポート基準で
+    // 固定して幅を確保済み)。デスクトップは position:absolute のままCSSのcalc(100% + 8px)
+    // に任せるので、ここでは触らない。
+    if (willOpen && window.matchMedia("(max-width: 600px)").matches) {
+      panel.style.top = btn.getBoundingClientRect().bottom + 8 + "px";
+    }
   });
   panel.addEventListener("click", (e) => e.stopPropagation());
   document.addEventListener("click", () => {
@@ -672,6 +680,9 @@ function wireSettingsPanel() {
 
 /* ===== 起動 ===== */
 async function main() {
+  // データ取得中の「読み込み中…」表示の間も固定バーでヘッダーが隠れないよう、先に計算しておく。
+  syncPrimaryOffset();
+
   const grid = document.getElementById("grid");
   grid.innerHTML = '<div class="loading">読み込み中…</div>';
 
