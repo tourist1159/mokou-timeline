@@ -489,7 +489,11 @@ body {
   .date-items.view-list .card-body { padding: 6px 10px; }
   /* 狭い画面では日付ラベルを上に横並びで置く (左に幅を割くと窮屈なため) */
   .date-group { flex-direction: column; gap: 6px; }
-  .date-label { width: auto; padding-top: 0; }
+  /* flex:0 0 76px はデスクトップの横幅指定のつもりだったが、モバイルは
+     flex-direction:column で主軸が縦になるため、76px が「高さ」として効いて
+     ラベルの箱が縦に間延びしていた (実測: テキストは20px程度なのに76px確保)。
+     flex-basis を auto に戻して中身の高さぶんだけにする。 */
+  .date-label { flex: 0 0 auto; width: auto; padding-top: 0; }
   /* .settings-group はモバイルの flex-wrap で行の左寄りに折り返されることがあり、
      right:0 (settings-group基準) のままだと画面左にはみ出して見切れる。
      ビューポート基準の position:fixed に切り替え、top は開くたびJSで計算する

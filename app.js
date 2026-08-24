@@ -23,15 +23,15 @@ const CONFIG = {
 /* ===== 状態 ===== */
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
-// view/timeline/newMarker は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
+// view/timeline/newMarker/showComments は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
 const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
-  view: "grid", timeline: true, newMarker: true,
+  view: "grid", timeline: true, newMarker: true, showComments: true,
 };
 
 /* ===== 表示設定 (localStorage) ===== */
 const SETTINGS_KEY = "mokou-timeline:settings";
-const DEFAULT_SETTINGS = { view: "grid", timeline: true, newMarker: true };
+const DEFAULT_SETTINGS = { view: "grid", timeline: true, newMarker: true, showComments: true };
 
 function loadSettings() {
   try {
@@ -46,7 +46,12 @@ function saveSettings() {
   try {
     localStorage.setItem(
       SETTINGS_KEY,
-      JSON.stringify({ view: state.view, timeline: state.timeline, newMarker: state.newMarker })
+      JSON.stringify({
+        view: state.view,
+        timeline: state.timeline,
+        newMarker: state.newMarker,
+        showComments: state.showComments,
+      })
     );
   } catch (e) {
     // プライベートブラウジング等で localStorage が使えない場合は諦める(機能はセッション内のみ動作)
@@ -319,7 +324,7 @@ function makeCard(item) {
   typeTag.textContent = item.type === "stream" ? "配信" : "動画";
   meta.appendChild(typeTag);
 
-  if (item.comments != null) {
+  if (state.showComments && item.comments != null) {
     const c = document.createElement("span");
     c.className = "comments";
     c.textContent = item.comments.toLocaleString();
@@ -334,7 +339,7 @@ function makeCard(item) {
   }
 
   // コメントデータがある配信のみ、流量グラフを開くボタンを表示（説明部分の右側）
-  if (item.comments != null && item.comments > 0) {
+  if (state.showComments && item.comments != null && item.comments > 0) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "graph-btn";
@@ -607,6 +612,7 @@ function syncChipUI() {
 function syncSettingsUI() {
   document.getElementById("toggle-timeline").checked = state.timeline;
   document.getElementById("toggle-newmarker").checked = state.newMarker;
+  document.getElementById("toggle-comments").checked = state.showComments;
 }
 
 /* ===== イベント ===== */
@@ -646,6 +652,11 @@ function wireEvents() {
   });
   document.getElementById("toggle-newmarker").addEventListener("change", (e) => {
     state.newMarker = e.target.checked;
+    saveSettings();
+    render();
+  });
+  document.getElementById("toggle-comments").addEventListener("change", (e) => {
+    state.showComments = e.target.checked;
     saveSettings();
     render();
   });
