@@ -184,7 +184,7 @@ body {
 #grid.with-timeline {
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  gap: 40px;
 }
 .date-group {
   display: flex;

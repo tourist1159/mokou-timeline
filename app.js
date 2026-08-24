@@ -100,15 +100,41 @@ function jstDateKey(d) {
   return d.toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
 }
 const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"];
-function timelineLabel(d) {
+// 時間軸のグループ化キー+ラベルを返す。
+// 今日/昨日/直近6日以内は日付ごと(exact date)、それより古いものは週/月/年単位に
+// まとめて「1週間前」「3ヶ月前」「2年前」のように表示する(古いほど細かい日付は不要なため)。
+function timelineBucket(d) {
   const key = jstDateKey(d);
   const now = new Date();
-  if (key === jstDateKey(now)) return "今日";
-  if (key === jstDateKey(new Date(now.getTime() - 86400000))) return "昨日";
-  const [, m, day] = key.split("-").map(Number);
-  // JSTの00:00固定でDateを作り、ブラウザのローカルタイムゾーンによる曜日ズレを防ぐ
-  const wd = WEEKDAY_JA[new Date(`${key}T00:00:00+09:00`).getDay()];
-  return `${m}/${day}(${wd})`;
+  const nowKey = jstDateKey(now);
+  if (key === nowKey) return { key, label: "今日" };
+  if (key === jstDateKey(new Date(now.getTime() - 86400000))) return { key, label: "昨日" };
+
+  const [ny, nm, nd] = nowKey.split("-").map(Number);
+  const [iy, im, id] = key.split("-").map(Number);
+  // 日付差はUTC扱いのタイムスタンプで計算し、夏時間等の影響を受けないようにする
+  const daysDiff = Math.round((Date.UTC(ny, nm - 1, nd) - Date.UTC(iy, im - 1, id)) / 86400000);
+
+  if (daysDiff <= 6) {
+    // JSTの00:00固定でDateを作り、ブラウザのローカルタイムゾーンによる曜日ズレを防ぐ
+    const wd = WEEKDAY_JA[new Date(`${key}T00:00:00+09:00`).getDay()];
+    return { key, label: `${im}/${id}(${wd})` };
+  }
+
+  // 暦月ベースの差。まだ同じ日を迎えていなければ1つ手前の月扱いにする
+  // (例: 今日8/23に対し7/25は「まだ8/23を迎えていない」ので1ヶ月前ではなく0ヶ月=週表示のまま)
+  let monthsDiff = (ny - iy) * 12 + (nm - im);
+  if (nd < id) monthsDiff -= 1;
+
+  if (monthsDiff < 1) {
+    const weeksAgo = Math.floor(daysDiff / 7);
+    return { key: `w${weeksAgo}`, label: `${weeksAgo}週間前` };
+  }
+  if (monthsDiff < 12) {
+    return { key: `m${monthsDiff}`, label: `${monthsDiff}ヶ月前` };
+  }
+  const yearsAgo = Math.floor(monthsDiff / 12);
+  return { key: `y${yearsAgo}`, label: `${yearsAgo}年前` };
 }
 function fmtDuration(sec, lengthStr) {
   if (lengthStr) return lengthStr;
@@ -467,9 +493,9 @@ function groupByDate(list) {
   const groups = [];
   let current = null;
   for (const item of list) {
-    const key = jstDateKey(item.start);
+    const { key, label } = timelineBucket(item.start);
     if (!current || current.key !== key) {
-      current = { key, label: timelineLabel(item.start), items: [] };
+      current = { key, label, items: [] };
       groups.push(current);
     }
     current.items.push(item);
