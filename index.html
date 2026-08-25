@@ -10,6 +10,9 @@
        ダーク化」等)が端末側でページを強制的にダーク化してしまい、ライトを選んでも
        白くならない現象が起きる。style.css側の color-scheme と合わせて二重に明示。 -->
   <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="favicon.ico" sizes="any" />
+  <link rel="icon" href="favicon.png?v=1" type="image/png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1" />
   <script>
     // CSS読み込み前にテーマを決定して <html data-theme> に反映する(ライト/ダーク切替時の
     // 一瞬の色チラつき防止)。app.js側の applyTheme() と同じロジックだが、CSSより先に
