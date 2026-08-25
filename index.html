@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>もこう アーカイブタイムライン</title>
   <meta name="description" content="もこうの YouTube 動画・配信、Kick 配信、Twitch 配信を時系列でまとめて表示" />
+  <!-- サイト自身がライト/ダーク両方に自前で対応していることをブラウザに明示する。
+       これが無いと、一部のモバイルブラウザ(Android Chromeの「ウェブページを自動的に
+       ダーク化」等)が端末側でページを強制的にダーク化してしまい、ライトを選んでも
+       白くならない現象が起きる。style.css側の color-scheme と合わせて二重に明示。 -->
+  <meta name="color-scheme" content="light dark" />
   <script>
     // CSS読み込み前にテーマを決定して <html data-theme> に反映する(ライト/ダーク切替時の
     // 一瞬の色チラつき防止)。app.js側の applyTheme() と同じロジックだが、CSSより先に
@@ -20,7 +25,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=15" />
+  <link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
   <header class="site-header">

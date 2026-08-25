@@ -1,4 +1,10 @@
 :root {
+  /* ブラウザに「このページは自前でライト/ダーク両対応している」と伝える。
+     無いとAndroid Chrome等の「Webページの強制ダーク化」機能が、ライト選択時の
+     出力を端末側で勝手に暗く塗り替えてしまうことがある(スクロールバー等の
+     ネイティブUIの見た目にも影響)。 */
+  color-scheme: light dark;
+
   /* ライトテーマ (デフォルト)。ダークは prefers-color-scheme / data-theme で上書きする */
   --bg: #f4f5f7;
   --surface: #ffffff;
@@ -28,6 +34,7 @@
 /* システム設定がダーク、かつユーザーが明示的にライトを選んでいない場合 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0f0f0f;
     --surface: #1c1c1c;
     --surface-2: #272727;
@@ -49,8 +56,16 @@
   }
 }
 
+/* ユーザーが明示的にライトを選んでいる場合。値そのものは基底の:rootと同じだが、
+   color-scheme を "light" だけに絞ることで端末側への signal を最も強くする
+   (システムがダークでも、この宣言がある限り強制ダーク化の対象から外れやすくなる)。 */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 /* ユーザーが明示的にダークを選んでいる場合 (システム設定に関わらず優先) */
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0f0f0f;
   --surface: #1c1c1c;
   --surface-2: #272727;
