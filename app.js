@@ -23,15 +23,17 @@ const CONFIG = {
 /* ===== 状態 ===== */
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
-// view/timeline/newMarker/showComments は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
+// view/timeline/newMarker/showComments/theme は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
 const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
-  view: "grid", timeline: true, newMarker: true, showComments: true,
+  view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
 };
 
 /* ===== 表示設定 (localStorage) ===== */
 const SETTINGS_KEY = "mokou-timeline:settings";
-const DEFAULT_SETTINGS = { view: "grid", timeline: true, newMarker: true, showComments: true };
+const DEFAULT_SETTINGS = {
+  view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
+};
 
 function loadSettings() {
   try {
@@ -51,11 +53,30 @@ function saveSettings() {
         timeline: state.timeline,
         newMarker: state.newMarker,
         showComments: state.showComments,
+        theme: state.theme,
       })
     );
   } catch (e) {
     // プライベートブラウジング等で localStorage が使えない場合は諦める(機能はセッション内のみ動作)
   }
+}
+
+/* ===== カラーテーマ =====
+ * state.theme: "system"(既定, prefers-color-schemeに追従) / "light" / "dark"。
+ * <html data-theme> に反映し、実際の色は style.css 側の CSS変数で切り替える。
+ * index.html 冒頭のインラインスクリプトが、CSS読み込み前に同じロジックで先に一度
+ * 適用しているため(チラつき防止)、ここでの再適用は実質的に整合性の再確認。 */
+function applyTheme() {
+  if (state.theme === "light" || state.theme === "dark") {
+    document.documentElement.setAttribute("data-theme", state.theme);
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+// 実際に見えているテーマ ("system" のときはOS設定を反映)。commentgraph.js からも使う。
+function resolvedTheme() {
+  if (state.theme === "light" || state.theme === "dark") return state.theme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 /* ===== 新着判定 (localStorage) =====
@@ -555,6 +576,7 @@ function render() {
   empty.hidden = list.length > 0;
   updateStats(list.length);
   syncPrimaryOffset();
+  applyTheme();
 }
 
 // モバイルでは .controls-primary が position:fixed (デスクトップでは display:contents
@@ -717,6 +739,11 @@ function wireSettingsPanel() {
 
 /* ===== 起動 ===== */
 async function main() {
+  // 表示設定(テーマ含む)はデータ取得を待たず先に読み込む。テーマ自体は index.html
+  // 冒頭のインラインスクリプトが既にCSS読み込み前に適用済みだが、ここでJS側のstateも
+  // 揃えておく(「読み込み中…」表示や設定パネルの見た目にも影響するため)。
+  Object.assign(state, loadSettings());
+  applyTheme();
   // データ取得中の「読み込み中…」表示の間も固定バーでヘッダーが隠れないよう、先に計算しておく。
   syncPrimaryOffset();
 
@@ -732,7 +759,6 @@ async function main() {
     return;
   }
 
-  Object.assign(state, loadSettings());
   markNewItems();
 
   buildChannelChips();

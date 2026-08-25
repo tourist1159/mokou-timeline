@@ -1,15 +1,74 @@
 :root {
+  /* ライトテーマ (デフォルト)。ダークは prefers-color-scheme / data-theme で上書きする */
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #ececef;
+  --border: rgba(0, 0, 0, 0.12);
+  --text: #16181c;
+  --text-dim: #5b6169;
+  --accent: #1a73e8;
+  --chip-active-text: #ffffff; /* .chip.active の背景(var(--text))の上に乗せる文字色 */
+  --controls-bg: rgba(255, 255, 255, 0.88);
+  --hover-border: rgba(0, 0, 0, 0.22);
+  --new-marker-color: #c0392b;
+  --tag-stream-color: #a83232;
+  --tag-stream-border: rgba(168, 50, 50, 0.35);
+  --tag-video-color: #1a5fb4;
+  --tag-video-border: rgba(26, 95, 180, 0.32);
+  --tag-deleted-color: #9a5b00;
+  --tag-deleted-border: rgba(154, 91, 0, 0.35);
+  --notice-color: #8a5a00;
+
+  --yt: #ff3d3d;
+  --kick: #53fc18;
+  --twitch: #9146ff;
+  --radius: 12px;
+}
+
+/* システム設定がダーク、かつユーザーが明示的にライトを選んでいない場合 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0f0f;
+    --surface: #1c1c1c;
+    --surface-2: #272727;
+    --border: rgba(255, 255, 255, 0.1);
+    --text: #f1f1f1;
+    --text-dim: #aaaaaa;
+    --accent: #3ea6ff;
+    --chip-active-text: #0f0f0f;
+    --controls-bg: rgba(15, 15, 15, 0.92);
+    --hover-border: rgba(255, 255, 255, 0.28);
+    --new-marker-color: #ff6b6b;
+    --tag-stream-color: #ffb3b3;
+    --tag-stream-border: rgba(255, 100, 100, 0.4);
+    --tag-video-color: #9fd0ff;
+    --tag-video-border: rgba(62, 166, 255, 0.4);
+    --tag-deleted-color: #ffb066;
+    --tag-deleted-border: rgba(255, 150, 60, 0.45);
+    --notice-color: #ffcf66;
+  }
+}
+
+/* ユーザーが明示的にダークを選んでいる場合 (システム設定に関わらず優先) */
+:root[data-theme="dark"] {
   --bg: #0f0f0f;
   --surface: #1c1c1c;
   --surface-2: #272727;
   --border: rgba(255, 255, 255, 0.1);
   --text: #f1f1f1;
   --text-dim: #aaaaaa;
-  --yt: #ff3d3d;
-  --kick: #53fc18;
-  --twitch: #9146ff;
   --accent: #3ea6ff;
-  --radius: 12px;
+  --chip-active-text: #0f0f0f;
+  --controls-bg: rgba(15, 15, 15, 0.92);
+  --hover-border: rgba(255, 255, 255, 0.28);
+  --new-marker-color: #ff6b6b;
+  --tag-stream-color: #ffb3b3;
+  --tag-stream-border: rgba(255, 100, 100, 0.4);
+  --tag-video-color: #9fd0ff;
+  --tag-video-border: rgba(62, 166, 255, 0.4);
+  --tag-deleted-color: #ffb066;
+  --tag-deleted-border: rgba(255, 150, 60, 0.45);
+  --notice-color: #ffcf66;
 }
 
 * { box-sizing: border-box; }
@@ -52,7 +111,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(15, 15, 15, 0.92);
+  background: var(--controls-bg);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   padding: 10px 20px;
@@ -94,7 +153,7 @@ body {
 .chip:hover { background: var(--surface-2); }
 .chip.active {
   background: var(--text);
-  color: #0f0f0f;
+  color: var(--chip-active-text);
   border-color: var(--text);
   font-weight: 600;
 }
@@ -171,7 +230,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #ff6b6b;
+  color: var(--new-marker-color);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -226,7 +285,7 @@ body {
 }
 .card:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--hover-border);
 }
 
 /* thumbnail */
@@ -286,7 +345,7 @@ body {
   font-family: inherit;
   transition: background 0.15s, border-color 0.15s;
 }
-.graph-btn:hover { background: var(--surface-2); border-color: rgba(255, 255, 255, 0.3); }
+.graph-btn:hover { background: var(--surface-2); border-color: var(--hover-border); }
 .duration {
   position: absolute;
   bottom: 8px;
@@ -332,9 +391,9 @@ body {
   padding: 1px 7px;
   font-size: 0.7rem;
 }
-.tag.stream { color: #ffb3b3; border-color: rgba(255, 100, 100, 0.4); }
-.tag.video { color: #9fd0ff; border-color: rgba(62, 166, 255, 0.4); }
-.tag.deleted { color: #ffb066; border-color: rgba(255, 150, 60, 0.45); }
+.tag.stream { color: var(--tag-stream-color); border-color: var(--tag-stream-border); }
+.tag.video { color: var(--tag-video-color); border-color: var(--tag-video-border); }
+.tag.deleted { color: var(--tag-deleted-color); border-color: var(--tag-deleted-border); }
 
 /* 配信元で削除された動画 (情報は残すがリンクはしない) */
 .card.unavailable { opacity: 0.5; cursor: default; }
@@ -465,7 +524,7 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   padding: 10px 20px;
-  color: #ffcf66;
+  color: var(--notice-color);
   font-size: 0.85rem;
 }
 .site-footer {
@@ -532,7 +591,7 @@ body {
     left: 0;
     right: 0;
     z-index: 10;
-    background: rgba(15, 15, 15, 0.92);
+    background: var(--controls-bg);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
     padding: 10px 14px;

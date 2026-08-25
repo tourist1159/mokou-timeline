@@ -9,7 +9,20 @@
  */
 
 const GRAPH_KEYWORDS = ["草|w", "8{3,}", "^あ+$"];
-const GRAPH_KEYWORD_COLORS = ["red", "orange", "cyan"];
+// ダーク背景向けの原色はライトテーマの白背景では視認性が落ちる(特に cyan)ため、
+// テーマごとに別の色セットを用意する (chartPalette 参照)。
+const GRAPH_KEYWORD_COLORS_DARK = ["red", "orange", "cyan"];
+const GRAPH_KEYWORD_COLORS_LIGHT = ["#c0392b", "#a06a00", "#0e7490"];
+
+// resolvedTheme() は app.js 側で定義 (commentgraph.js は app.js の後に読み込まれる)。
+function chartPalette() {
+  const dark = resolvedTheme() === "dark";
+  return {
+    totalColor: dark ? "lime" : "#1a7a1a",
+    keywordColors: dark ? GRAPH_KEYWORD_COLORS_DARK : GRAPH_KEYWORD_COLORS_LIGHT,
+    legendColor: dark ? "#ccc" : "#333",
+  };
+}
 
 const COMMENTS_BASE = {
   youtube: "https://tourist1159.github.io/youtube-comment-fetcher/comments_github/",
@@ -196,6 +209,7 @@ function setYoutubeSeekLink(link, item, seconds) {
 
 function renderChart(canvas, agg, item, link) {
   const ctx = canvas.getContext("2d");
+  const palette = chartPalette();
   return new window.Chart(ctx, {
     type: "line",
     data: {
@@ -204,7 +218,7 @@ function renderChart(canvas, agg, item, link) {
         {
           label: "全コメント",
           data: agg.totalCounts,
-          borderColor: "lime",
+          borderColor: palette.totalColor,
           borderWidth: 2,
           fill: false,
           tension: 0.3,
@@ -214,7 +228,7 @@ function renderChart(canvas, agg, item, link) {
         ...GRAPH_KEYWORDS.map((word, i) => ({
           label: word,
           data: agg.keywordCounts[word],
-          borderColor: GRAPH_KEYWORD_COLORS[i % GRAPH_KEYWORD_COLORS.length],
+          borderColor: palette.keywordColors[i % palette.keywordColors.length],
           borderWidth: 1.5,
           fill: false,
           tension: 0.3,
@@ -230,7 +244,7 @@ function renderChart(canvas, agg, item, link) {
       interaction: { mode: "nearest", intersect: false },
       plugins: {
         legend: {
-          labels: { color: "#ccc", boxWidth: 12, font: { size: 11 } },
+          labels: { color: palette.legendColor, boxWidth: 12, font: { size: 11 } },
           onClick: (e, legendItem, legend) => {
             const ch = legend.chart;
             const di = legendItem.datasetIndex;

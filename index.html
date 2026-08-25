@@ -5,7 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>もこう アーカイブタイムライン</title>
   <meta name="description" content="もこうの YouTube 動画・配信、Kick 配信、Twitch 配信を時系列でまとめて表示" />
-  <link rel="stylesheet" href="style.css?v=14" />
+  <script>
+    // CSS読み込み前にテーマを決定して <html data-theme> に反映する(ライト/ダーク切替時の
+    // 一瞬の色チラつき防止)。app.js側の applyTheme() と同じロジックだが、CSSより先に
+    // 実行する必要があるため独立して持つ。"system" (未設定) なら何もせず、CSSの
+    // prefers-color-scheme に任せる。
+    (function () {
+      try {
+        var raw = localStorage.getItem("mokou-timeline:settings");
+        var theme = raw ? JSON.parse(raw).theme : null;
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.setAttribute("data-theme", theme);
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
   <header class="site-header">
@@ -56,6 +71,14 @@
         <button class="settings-btn" id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">⚙️ 表示設定</button>
         <div class="settings-panel" id="settings-panel" hidden>
           <div class="settings-row">
+            <span class="control-label">カラーテーマ</span>
+            <div class="control-group" id="theme-toggle" data-key="theme">
+              <button class="chip active" data-value="system">端末に合わせる</button>
+              <button class="chip" data-value="light">ライト</button>
+              <button class="chip" data-value="dark">ダーク</button>
+            </div>
+          </div>
+          <div class="settings-row">
             <span class="control-label">表示形式</span>
             <div class="control-group" id="view-toggle" data-key="view">
               <button class="chip active" data-value="grid">グリッド</button>
@@ -88,7 +111,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=13"></script>
-  <script src="commentgraph.js?v=7"></script>
+  <script src="app.js?v=14"></script>
+  <script src="commentgraph.js?v=8"></script>
 </body>
 </html>
