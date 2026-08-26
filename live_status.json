@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-08-26T11:13:13.034779+00:00",
-  "live": []
+  "checked_at": "2026-08-26T11:19:23.919358+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "病み上がりで撮る",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://stream.kick.com/thumbnails/livestream/124140815/thumb0/video_thumbnail/thumb0.jpg",
+      "viewers": null
+    }
+  ]
 }
