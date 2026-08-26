@@ -534,6 +534,13 @@ function renderFlat(list, boundary, frag) {
 function renderWithTimeline(list, boundary, frag) {
   let i = 0;
   for (const group of groupByDate(list)) {
+    // 境界がこのグループの先頭に来る場合、そのままだと日付ラベルと同じ高さに
+    // マーカーが並んでしまい重なって見えるため、グループの外(セクションの間)に
+    // 独立した行として出す。同じ日の中に新着/既知が混在する場合(グループ途中で
+    // 境界を迎える場合)は従来どおりカードの間に挟む。
+    const atGroupStart = i === boundary;
+    if (atGroupStart) frag.appendChild(makeNewMarker());
+
     const section = document.createElement("section");
     section.className = "date-group";
 
@@ -545,7 +552,7 @@ function renderWithTimeline(list, boundary, frag) {
     const items = document.createElement("div");
     items.className = "date-items " + (state.view === "list" ? "view-list" : "view-grid");
     for (const item of group.items) {
-      if (i === boundary) items.appendChild(makeNewMarker());
+      if (!atGroupStart && i === boundary) items.appendChild(makeNewMarker());
       items.appendChild(makeCard(item));
       i++;
     }
