@@ -133,7 +133,11 @@ def extract_youtube_title(page):
 
 
 def check_kick_live():
-    url = f"https://kick.com/api/v2/channels/{KICK_CHANNEL}"
+    # /api/v2/channels/<slug> の livestream.thumbnail は配信中でも常に null で
+    # 実際のサムネイルが取れない(実測で確認済み)。専用の /livestream サブエンドポイント
+    # なら配信中の実サムネイル(thumbnail.src、数分おきに更新される版のURL)が取れる。
+    # 配信外は {"data": null} を返すので、そのままライブ判定にも使える。
+    url = f"https://kick.com/api/v2/channels/{KICK_CHANNEL}/livestream"
     try:
         body = fetch(url, headers={"Accept": "application/json", "Referer": "https://kick.com/"})
         data = json.loads(body)
@@ -144,14 +148,14 @@ def check_kick_live():
         print(f"[kick] JSON解析エラー: {e}")
         return None
 
-    ls = data.get("livestream")
+    ls = data.get("data")
     if not ls:
         return None  # ライブ中でない
 
     title = ls.get("session_title") or ls.get("title") or "配信中"
     thumb_obj = ls.get("thumbnail") or {}
-    thumbnail = thumb_obj.get("url") or thumb_obj.get("src") if isinstance(thumb_obj, dict) else None
-    viewers = ls.get("viewer_count") or ls.get("viewers")
+    thumbnail = thumb_obj.get("src") or thumb_obj.get("url") if isinstance(thumb_obj, dict) else None
+    viewers = ls.get("viewers") or ls.get("viewer_count")
 
     return {
         "platform": "kick",
