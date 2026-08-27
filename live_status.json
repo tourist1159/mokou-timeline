@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-08-27T17:45:38.576798+00:00",
+  "checked_at": "2026-08-27T17:49:47.290491+00:00",
   "live": [
     {
       "platform": "twitch",
@@ -7,7 +7,7 @@
       "title": "放送中！",
       "url": "https://www.twitch.tv/mokouliszt1",
       "thumbnail": "https://static-cdn.jtvnw.net/previews-ttv/live_user_mokouliszt1-{width}x{height}.jpg",
-      "viewers": 458
+      "viewers": 398
     }
   ]
 }
