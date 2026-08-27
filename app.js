@@ -19,7 +19,7 @@ const CONFIG = {
   },
   // チャンネルフィルタに並べる順。Kick/Twitchは単一チャンネルなので配信元フィルタと
   // 重複するため出さない (YouTubeの2チャンネルのみ)
-  channelOrder: ["mokouliszt", "mokoustream"],
+  channelOrder: ["mokoustream", "mokouliszt"],
 };
 
 /* ===== 状態 ===== */
@@ -364,6 +364,14 @@ function makeCard(item) {
   date.textContent = fmtDate(item.start);
   meta.appendChild(date);
 
+  // チャンネル名はYouTubeのみ表示 (2チャンネルあり区別が要る。Kick/Twitchは単一チャンネルのため不要)
+  if (item.platform === "youtube") {
+    const chTag = document.createElement("span");
+    chTag.className = "tag";
+    chTag.textContent = channelLabel(item.channel);
+    meta.appendChild(chTag);
+  }
+
   const typeTag = document.createElement("span");
   typeTag.className = "tag " + item.type;
   typeTag.textContent = item.type === "stream" ? "配信" : "動画";
@@ -444,11 +452,6 @@ function makeLiveCard(item) {
   const chSpan = document.createElement("span");
   chSpan.textContent = channelLabel(item.channel);
   meta.appendChild(chSpan);
-  if (typeof item.viewers === "number") {
-    const v = document.createElement("span");
-    v.textContent = `👁 ${item.viewers.toLocaleString()}`;
-    meta.appendChild(v);
-  }
   info.appendChild(meta);
   card.appendChild(info);
 
