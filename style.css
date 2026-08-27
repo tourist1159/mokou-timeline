@@ -209,11 +209,39 @@ body {
 .settings-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 0.83rem;
   cursor: pointer;
 }
-.settings-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+/* スライドスイッチ (checkbox の見た目をトラック+つまみに差し替える) */
+.settings-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--border);
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.settings-toggle input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+.settings-toggle input:checked { background: var(--accent); }
+.settings-toggle input:checked::before { transform: translateX(14px); }
 #search {
   background: var(--surface);
   border: 1px solid var(--border);

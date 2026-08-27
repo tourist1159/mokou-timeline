@@ -23,16 +23,18 @@ const CONFIG = {
 /* ===== 状態 ===== */
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
-// view/timeline/newMarker/showComments/theme は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
+// view/timeline/newMarker/showComments/theme/onlyAvailable は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
 const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
+  onlyAvailable: false,
 };
 
 /* ===== 表示設定 (localStorage) ===== */
 const SETTINGS_KEY = "mokou-timeline:settings";
 const DEFAULT_SETTINGS = {
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
+  onlyAvailable: false,
 };
 
 function loadSettings() {
@@ -54,6 +56,7 @@ function saveSettings() {
         newMarker: state.newMarker,
         showComments: state.showComments,
         theme: state.theme,
+        onlyAvailable: state.onlyAvailable,
       })
     );
   } catch (e) {
@@ -278,6 +281,7 @@ function applyFilters() {
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
+    if (state.onlyAvailable && !x.available) return false;
     if (q && !normalizeText(x.title).includes(q)) return false;
     return true;
   });
@@ -668,6 +672,7 @@ function syncSettingsUI() {
   document.getElementById("toggle-timeline").checked = state.timeline;
   document.getElementById("toggle-newmarker").checked = state.newMarker;
   document.getElementById("toggle-comments").checked = state.showComments;
+  document.getElementById("toggle-available").checked = state.onlyAvailable;
 }
 
 /* ===== イベント ===== */
@@ -712,6 +717,11 @@ function wireEvents() {
   });
   document.getElementById("toggle-comments").addEventListener("change", (e) => {
     state.showComments = e.target.checked;
+    saveSettings();
+    render();
+  });
+  document.getElementById("toggle-available").addEventListener("change", (e) => {
+    state.onlyAvailable = e.target.checked;
     saveSettings();
     render();
   });
