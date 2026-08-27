@@ -9,15 +9,17 @@ const CONFIG = {
     // 同一オリジン (このサイト自身が1分間隔で更新・公開する)
     liveStatus: "live_status.json",
   },
-  // チャンネル表示名（フィルタチップ・カードのバッジ用）
+  // チャンネル表示名（ライブバナー等で使用。Kick/Twitchは単一チャンネルのため
+  // フィルタチップは出さないが、ラベル自体は他の表示箇所のために残す）
   channelLabels: {
-    mokouliszt: "もこう",
-    mokoustream: "mokoustream",
+    mokouliszt: "とある漢",
+    mokoustream: "もこうの実況",
     mokoutoaruotoko: "Kick本配信",
     mokouliszt1: "Twitch配信",
   },
-  // チャンネルフィルタに並べる順
-  channelOrder: ["mokouliszt", "mokoustream", "mokoutoaruotoko", "mokouliszt1"],
+  // チャンネルフィルタに並べる順。Kick/Twitchは単一チャンネルなので配信元フィルタと
+  // 重複するため出さない (YouTubeの2チャンネルのみ)
+  channelOrder: ["mokouliszt", "mokoustream"],
 };
 
 /* ===== 状態 ===== */
@@ -115,9 +117,6 @@ const dateFmt = new Intl.DateTimeFormat("ja-JP", {
 });
 function fmtDate(d) {
   return d && !isNaN(d) ? dateFmt.format(d) : "";
-}
-function fmtDateOnly(d) {
-  return d && !isNaN(d) ? d.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "";
 }
 // JST基準の日付キー "YYYY-MM-DD"。訪問者のブラウザのタイムゾーンに関わらず日本時間で揃える。
 function jstDateKey(d) {
@@ -365,11 +364,6 @@ function makeCard(item) {
   date.textContent = fmtDate(item.start);
   meta.appendChild(date);
 
-  const chTag = document.createElement("span");
-  chTag.className = "tag";
-  chTag.textContent = channelLabel(item.channel);
-  meta.appendChild(chTag);
-
   const typeTag = document.createElement("span");
   typeTag.className = "tag " + item.type;
   typeTag.textContent = item.type === "stream" ? "配信" : "動画";
@@ -585,7 +579,6 @@ function render() {
   grid.appendChild(frag);
 
   empty.hidden = list.length > 0;
-  updateStats(list.length);
   syncPrimaryOffset();
   applyTheme();
 }
@@ -597,29 +590,6 @@ function render() {
 function syncPrimaryOffset() {
   const primary = document.querySelector(".controls-primary");
   document.body.style.paddingTop = primary.offsetHeight + "px";
-}
-
-function updateStats(shown) {
-  const yt = ALL.filter((x) => x.platform === "youtube").length;
-  const kk = ALL.filter((x) => x.platform === "kick").length;
-  const tw = ALL.filter((x) => x.platform === "twitch").length;
-  const streams = ALL.filter((x) => x.type === "stream").length;
-  const videos = ALL.filter((x) => x.type === "video").length;
-  const dates = ALL.map((x) => x.start).sort((a, b) => a - b);
-  const range = dates.length ? `${fmtDateOnly(dates[0])} 〜 ${fmtDateOnly(dates[dates.length - 1])}` : "";
-  const el = document.getElementById("stats");
-  el.innerHTML = "";
-  const add = (html) => {
-    const s = document.createElement("span");
-    s.innerHTML = html;
-    el.appendChild(s);
-  };
-  const gone = ALL.filter((x) => !x.available).length;
-  add(`表示 <b>${shown}</b> / 全 <b>${ALL.length}</b> 件`);
-  add(`YouTube <b>${yt}</b>・Kick <b>${kk}</b>・Twitch <b>${tw}</b>`);
-  add(`配信 <b>${streams}</b>・動画 <b>${videos}</b>`);
-  if (gone) add(`視聴可 <b>${ALL.length - gone}</b>・削除済み <b>${gone}</b>`);
-  if (range) add(`期間 <b>${range}</b>`);
 }
 
 /* ===== チャンネルフィルタのチップを動的生成 ===== */
