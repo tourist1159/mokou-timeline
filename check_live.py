@@ -1,10 +1,12 @@
 """
 YouTube (2チャンネル) / Kick が現在ライブ配信中かどうかを調べ、live_status.json に書き出す。
 
-- YouTube: https://www.youtube.com/channel/<id>/live を取得し、HTML内の
-  <link rel="canonical"> を見る。非ライブ時はチャンネルページのまま、ライブ中は
-  /watch?v=<videoId> になる (実測で確認済み)。yt-dlp/innertube API を使わない単純な
-  ページ取得なので、GitHub Actions のデータセンターIPでも bot 判定されにくい。
+- YouTube: https://www.youtube.com/channel/<id>/live を取得し、HTML内に埋め込まれた
+  videoDetails.isLive を見る (配信中でなければ videoDetails 自体が存在しない)。
+  <link rel="canonical"> ベースの判定は GitHub Actions のランナーIPから href="undefined"
+  という壊れた値が返ることがあり(地域/IP依存、ローカルからは再現せず)信頼できなかった
+  ため、この方式に変更した。yt-dlp/innertube API を使わない単純なページ取得なので、
+  GitHub Actions のデータセンターIPでも bot 判定されにくい。
 - Kick: https://kick.com/api/v2/channels/<slug> の `livestream` フィールドを見る
   (配信中はオブジェクト、非配信時は null。実測で確認済み)。
 - Twitch: Helix API の `GET /helix/streams?user_login=<login>` を見る (配信中は
@@ -73,12 +75,17 @@ DISPATCH_TARGETS = {
 # この秒数以上経っていれば checked_at だけの更新でも書き出す (死活確認用の heartbeat)。
 HEARTBEAT_SECONDS = 900
 
-CANONICAL_RE = re.compile(r'<link rel="canonical" href="([^"]+)"')
 # 実測の結果、/channel/<id>/live には og:title/og:image が無く、
 # <meta name="title" content="..."> と <title>...</title> のみ存在する。
 META_TITLE_RE = re.compile(r'<meta name="title" content="([^"]+)"')
 TITLE_TAG_RE = re.compile(r"<title>([^<]+)</title>")
-VIDEO_ID_RE = re.compile(r"v=([\w-]{11})")
+# <link rel="canonical"> ベースの判定 (非ライブ時はチャンネルページのまま、ライブ中は
+# /watch?v=<videoId> になる) は、GitHub Actions のランナーIPからだと href="undefined" という
+# 壊れた値が返ることがあり(ローカルからは再現せず、地域/IP依存と思われる)信頼できなかった。
+# 代わりに埋め込みプレイヤーの videoDetails (視聴ページの再生情報と同じ構造、videoId直後に
+# isLive が来る) を見る。配信中でなければ videoDetails 自体がページに存在しないため、
+# canonical の壊れ方に関係なく判定できる (実測で確認済み)。
+VIDEO_DETAILS_RE = re.compile(r'"videoDetails":\{"videoId":"([\w-]{11})".{0,200}?"isLive":(true|false)')
 
 
 def fetch(url, headers=None):
@@ -90,53 +97,19 @@ def fetch(url, headers=None):
         return res.read().decode("utf-8", "replace")
 
 
-def extract_canonical(page):
-    m = CANONICAL_RE.search(page)
-    return m.group(1) if m else ""
-
-
 def check_youtube_live(channel_id, handle):
     url = f"https://www.youtube.com/channel/{channel_id}/live"
     try:
-        # CONSENT cookie: 地域(GitHub Actionsランナーの出口IPがEU圏になった場合など)に
-        # よっては本来のチャンネルページの代わりに同意画面が返り、canonical が /watch に
-        # ならず「ライブ中でない」と誤判定することがある(既知のYouTubeスクレイピング事情)。
-        # このcookieを常時付与して同意画面をスキップする。
-        page = fetch(url, headers={"Cookie": "CONSENT=YES+1"})
-        canonical = extract_canonical(page)
-        if not canonical or canonical == "undefined":
-            # このcookie自体が逆に不完全なページ(canonicalが文字列"undefined"になる等)を
-            # 引き起こすことがあるかもしれないので、cookie無しでも再取得してみる。
-            print(f"[youtube/{handle}] canonicalが不正 ({canonical!r}) のため cookie 無しで再取得")
-            page = fetch(url)
-            canonical = extract_canonical(page)
-        if not canonical or canonical == "undefined":
-            # cookieの有無に関わらず不正 = cookie は原因ではない。次回の原因特定のため、
-            # ページの手がかりをできるだけ残しておく。
-            idx = page.find('href="undefined"')
-            context = page[max(0, idx - 150) : idx + 150] if idx != -1 else "(該当箇所なし)"
-            print(
-                f"[youtube/{handle}] cookie無しでも不正 (cookieは原因でない)。"
-                f"page_len={len(page)} "
-                f"has_ytInitialData={'ytInitialData' in page} "
-                f"has_consent_wall={'consent.youtube.com' in page or 'Before you continue' in page} "
-                f"context={context!r}"
-            )
+        page = fetch(url)
     except (HTTPError, URLError) as e:
         print(f"[youtube/{handle}] 取得エラー: {e}")
         return None
 
-    if "/watch" not in canonical:
-        # 誤判定の切り分け用に、何が返ってきたか分かるようにしておく
-        print(f"[youtube/{handle}] ライブ中でない (canonical={canonical!r})")
+    m = VIDEO_DETAILS_RE.search(page)
+    if not m or m.group(2) != "true":
         return None  # ライブ中でない
 
-    vid_m = VIDEO_ID_RE.search(canonical)
-    if not vid_m:
-        print(f"[youtube/{handle}] canonicalにvideoIdが見つからない: {canonical!r}")
-        return None
-    video_id = vid_m.group(1)
-
+    video_id = m.group(1)
     title = extract_youtube_title(page)
 
     return {
