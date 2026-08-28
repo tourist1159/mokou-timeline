@@ -93,7 +93,11 @@ def fetch(url, headers=None):
 def check_youtube_live(channel_id, handle):
     url = f"https://www.youtube.com/channel/{channel_id}/live"
     try:
-        page = fetch(url)
+        # CONSENT cookie: 地域(GitHub Actionsランナーの出口IPがEU圏になった場合など)に
+        # よっては本来のチャンネルページの代わりに同意画面が返り、canonical が /watch に
+        # ならず「ライブ中でない」と誤判定することがある(既知のYouTubeスクレイピング事情)。
+        # このcookieを常時付与して同意画面をスキップする。
+        page = fetch(url, headers={"Cookie": "CONSENT=YES+1"})
     except (HTTPError, URLError) as e:
         print(f"[youtube/{handle}] 取得エラー: {e}")
         return None
@@ -101,10 +105,13 @@ def check_youtube_live(channel_id, handle):
     m = CANONICAL_RE.search(page)
     canonical = m.group(1) if m else ""
     if "/watch" not in canonical:
+        # 誤判定の切り分け用に、何が返ってきたか分かるようにしておく
+        print(f"[youtube/{handle}] ライブ中でない (canonical={canonical!r})")
         return None  # ライブ中でない
 
     vid_m = VIDEO_ID_RE.search(canonical)
     if not vid_m:
+        print(f"[youtube/{handle}] canonicalにvideoIdが見つからない: {canonical!r}")
         return None
     video_id = vid_m.group(1)
 
