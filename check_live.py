@@ -1,18 +1,33 @@
 """
-YouTube (2チャンネル) / Kick が現在ライブ配信中かどうかを調べ、live_status.json に書き出す。
+YouTube (2チャンネル) / Kick / Twitch が現在ライブ配信中かどうかを調べ、live_status.json に書き出す。
 
-- YouTube: https://www.youtube.com/channel/<id>/live を取得し、HTML内に埋め込まれた
-  videoDetails.isLive を見る (配信中でなければ videoDetails 自体が存在しない)。
-  <link rel="canonical"> ベースの判定は GitHub Actions のランナーIPから href="undefined"
-  という壊れた値が返ることがあり(地域/IP依存、ローカルからは再現せず)信頼できなかった
-  ため、この方式に変更した。yt-dlp/innertube API を使わない単純なページ取得なので、
-  GitHub Actions のデータセンターIPでも bot 判定されにくい。
-- Kick: https://kick.com/api/v2/channels/<slug> の `livestream` フィールドを見る
+- YouTube: yt-dlp の **flat 抽出**で `/channel/<id>/streams` タブの先頭数件を列挙し、
+  `live_status == "is_live"` のエントリがあればライブ中とみなす。
+  以前は `/channel/<id>/live` の HTML を直接読んでいたが、GitHub Actions のランナーIPから
+  だとこのページが壊れた形で返ってくる(ローカルからは再現しない)ことが実測で確認された:
+    * `<link rel="canonical">` が文字列 `"undefined"` になる
+    * 視聴ページの再生情報 (`"videoDetails":{...,"isLive":true}`) が埋め込まれない
+  ページ自体は 1.1MB 前後あり ytInitialData も同意ウォールも正常なので、bot ブロックの
+  ページを掴まされているわけではなく、`/live` の解決結果だけが欠けた状態で返ってくる。
+  つまり **HTML をどう解析しても Actions 上では判定できない**。
+  一方 flat 抽出 (タブの一覧取得のみ、1件ずつのフル extract_info はしない) は
+  youtube-comment-fetcher の meta-fetch が同じ Actions 上で常用していて bot 判定を
+  受けていない実績があるため、こちらに寄せた。念のため旧方式のページ取得も残してあるが、
+  「ライブである」という肯定の手掛かりを拾う用途だけに使う (下記 UNKNOWN を参照)。
+- Kick: https://kick.com/api/v2/channels/<slug>/livestream の `data` を見る
   (配信中はオブジェクト、非配信時は null。実測で確認済み)。
 - Twitch: Helix API の `GET /helix/streams?user_login=<login>` を見る (配信中は
   data が非空、非配信時は空配列)。App Access Token (Client Credentials Flow) が要る
   ので TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET を環境変数(Secrets)で渡す。未設定でも
   他プラットフォームの判定は継続する(静かにスキップ)。
+
+各 check_xxx_live() の戻り値は3値:
+  dict    … ライブ中 (live_status.json に載せるエントリ)
+  None    … ライブ中でないと確定できた
+  UNKNOWN … 判定できなかった (取得エラー等)
+UNKNOWN のときは直前の状態を引き継ぐ。一時的な通信エラーで LIVE バナーが消えたり、
+下記の「配信終了」誤検知でアーカイブ収集が無駄に起動したりするのを避けるため。
+ただし引き継ぎっぱなしで固まらないよう STALE_SECONDS で打ち切る。
 
 さらに、このスクリプトは「配信終了」を検知した瞬間に対応するアーカイブ収集リポジトリの
 Actions を workflow_dispatch で起動する (dispatch_ended_streams 以下)。各アーカイブ収集は
@@ -45,6 +60,11 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 
+try:
+    from yt_dlp import YoutubeDL
+except ImportError:  # ローカルで未インストールでも、ページ取得のフォールバックだけは動かす
+    YoutubeDL = None
+
 print = functools.partial(print, file=sys.stderr, flush=True)
 
 UA = (
@@ -60,6 +80,17 @@ KICK_CHANNEL = "mokoutoaruotoko"
 TWITCH_CHANNEL = "mokouliszt1"
 
 OUT_FILE = "live_status.json"
+
+# 「判定できなかった」を表す番兵 (None = 「ライブでないと確定」と区別する)
+UNKNOWN = "unknown"
+
+# /streams タブの先頭から何件見るか。配信中のものは基本的に先頭だが、予定(is_upcoming)の
+# 配信が上に並ぶことがあるので少し余裕を持たせる。
+STREAMS_SCAN = 5
+
+# UNKNOWN が続いたときに直前のライブ状態を引き継ぐ上限。これを超えたら諦めて取り下げる
+# (YouTube 側で本当に終わっているのに LIVE バナーが出っぱなしになるのを防ぐ)。
+STALE_SECONDS = 900
 
 # 配信終了検知 → 起動するアーカイブ収集repoの対応表 (platform, channel) -> (repo, workflow_file)
 GITHUB_OWNER = "tourist1159"
@@ -79,12 +110,8 @@ HEARTBEAT_SECONDS = 900
 # <meta name="title" content="..."> と <title>...</title> のみ存在する。
 META_TITLE_RE = re.compile(r'<meta name="title" content="([^"]+)"')
 TITLE_TAG_RE = re.compile(r"<title>([^<]+)</title>")
-# <link rel="canonical"> ベースの判定 (非ライブ時はチャンネルページのまま、ライブ中は
-# /watch?v=<videoId> になる) は、GitHub Actions のランナーIPからだと href="undefined" という
-# 壊れた値が返ることがあり(ローカルからは再現せず、地域/IP依存と思われる)信頼できなかった。
-# 代わりに埋め込みプレイヤーの videoDetails (視聴ページの再生情報と同じ構造、videoId直後に
-# isLive が来る) を見る。配信中でなければ videoDetails 自体がページに存在しないため、
-# canonical の壊れ方に関係なく判定できる (実測で確認済み)。
+# 視聴ページの再生情報 (videoId の直後に isLive が来る)。ローカルIPからは取れるが、
+# Actions のIPからは丸ごと欠落する (モジュール冒頭の説明を参照)。
 VIDEO_DETAILS_RE = re.compile(r'"videoDetails":\{"videoId":"([\w-]{11})".{0,200}?"isLive":(true|false)')
 
 
@@ -97,28 +124,81 @@ def fetch(url, headers=None):
         return res.read().decode("utf-8", "replace")
 
 
+# === YouTube ===
+def list_recent_streams(channel_id, handle):
+    """/streams タブの新しい順 STREAMS_SCAN 件を flat 抽出する。失敗時は None。
+
+    extract_flat = 一覧の取得のみで、1件ずつのフル extract_info (innertube の player
+    呼び出し) はしない。過去に bot 判定を受けたのは後者であり、flat 抽出は Actions 上
+    でも通っている (youtube-comment-fetcher の meta-fetch で実績あり)。
+    """
+    if YoutubeDL is None:
+        print(f"[youtube/{handle}] yt-dlp が未インストール (pip install yt-dlp)")
+        return None
+
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "extract_flat": "in_playlist",
+        "playlistend": STREAMS_SCAN,
+        "socket_timeout": 20,
+    }
+    url = f"https://www.youtube.com/channel/{channel_id}/streams"
+    try:
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as e:  # yt-dlp の例外は種類が多いので広く捕まえる
+        print(f"[youtube/{handle}] yt-dlp 列挙に失敗: {type(e).__name__}: {e}")
+        return None
+
+    entries = []
+    for i, e in enumerate((info or {}).get("entries") or []):
+        if i >= STREAMS_SCAN:
+            break
+        if e:
+            entries.append(e)
+    return entries
+
+
 def check_youtube_live(channel_id, handle):
+    entries = list_recent_streams(channel_id, handle)
+    if entries is not None:
+        for e in entries:
+            # is_live 以外は not_live / was_live / is_upcoming (予定枠は出さない)
+            if e.get("live_status") == "is_live" and e.get("id"):
+                return youtube_entry(handle, e["id"], e.get("title"))
+        return None  # ライブ中でないと確定
+
+    # yt-dlp が使えなかったときだけ、旧方式のページ取得を試す。ただし Actions のIPからは
+    # ライブ中でも痕跡が返らないことが分かっているので、「ライブである」という肯定の
+    # 手掛かりだけ採用し、見つからない場合は「ライブでない」とは断定しない。
+    hit = check_youtube_live_via_page(channel_id, handle)
+    return hit if hit else UNKNOWN
+
+
+def check_youtube_live_via_page(channel_id, handle):
     url = f"https://www.youtube.com/channel/{channel_id}/live"
     try:
         page = fetch(url)
     except (HTTPError, URLError) as e:
-        print(f"[youtube/{handle}] 取得エラー: {e}")
+        print(f"[youtube/{handle}] ページ取得エラー: {e}")
         return None
 
     m = VIDEO_DETAILS_RE.search(page)
     if not m or m.group(2) != "true":
-        return None  # ライブ中でない
+        return None
+    return youtube_entry(handle, m.group(1), extract_youtube_title(page))
 
-    video_id = m.group(1)
-    title = extract_youtube_title(page)
 
+def youtube_entry(handle, video_id, title):
     return {
         "platform": "youtube",
         "channel": handle,
-        "title": title,
+        "title": title or "配信中",
         "url": f"https://www.youtube.com/watch?v={video_id}",
         "videoId": video_id,
-        # サムネイルは動画IDから直接構築する (ページ内に og:image 等が無いため)。
+        # サムネイルは動画IDから直接構築する (どの取得経路でも同じURLになるようにするため)。
         "thumbnail": f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
     }
 
@@ -134,6 +214,7 @@ def extract_youtube_title(page):
     return "配信中"
 
 
+# === Kick ===
 def check_kick_live():
     # /api/v2/channels/<slug> の livestream.thumbnail は配信中でも常に null で
     # 実際のサムネイルが取れない(実測で確認済み)。専用の /livestream サブエンドポイント
@@ -145,10 +226,10 @@ def check_kick_live():
         data = json.loads(body)
     except (HTTPError, URLError) as e:
         print(f"[kick] 取得エラー: {e}")
-        return None
+        return UNKNOWN
     except json.JSONDecodeError as e:
         print(f"[kick] JSON解析エラー: {e}")
-        return None
+        return UNKNOWN
 
     ls = data.get("data")
     if not ls:
@@ -169,6 +250,7 @@ def check_kick_live():
     }
 
 
+# === Twitch ===
 def get_twitch_app_token():
     client_id = os.environ.get("TWITCH_CLIENT_ID")
     client_secret = os.environ.get("TWITCH_CLIENT_SECRET")
@@ -192,9 +274,11 @@ def get_twitch_app_token():
 
 def check_twitch_live():
     client_id = os.environ.get("TWITCH_CLIENT_ID")
-    token = get_twitch_app_token()
-    if not client_id or not token:
+    if not client_id or not os.environ.get("TWITCH_CLIENT_SECRET"):
         return None  # Secret未設定でも他プラットフォームは動かす
+    token = get_twitch_app_token()
+    if not token:
+        return UNKNOWN  # Secretはあるのに取れなかった = 一時的な失敗
 
     url = f"https://api.twitch.tv/helix/streams?user_login={TWITCH_CHANNEL}"
     try:
@@ -202,10 +286,10 @@ def check_twitch_live():
         data = json.loads(body).get("data") or []
     except (HTTPError, URLError) as e:
         print(f"[twitch] 取得エラー: {e}")
-        return None
+        return UNKNOWN
     except json.JSONDecodeError as e:
         print(f"[twitch] JSON解析エラー: {e}")
-        return None
+        return UNKNOWN
 
     if not data:
         return None  # ライブ中でない
@@ -223,13 +307,47 @@ def check_twitch_live():
     }
 
 
+# === 判定不能時の引き継ぎ ===
+def parse_iso(value):
+    try:
+        dt = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def carry_over(prev_live, key, now):
+    """判定不能だったチャンネルについて、直前のライブエントリを引き継ぐ (無ければ None)。
+
+    引き継いだエントリには stale_since (最初に判定不能になった時刻) を持たせ、
+    STALE_SECONDS を超えたら諦める。
+    """
+    platform, channel = key
+    prev_entry = next(
+        (x for x in (prev_live or []) if (x.get("platform"), x.get("channel")) == key), None
+    )
+    if not prev_entry:
+        # 元々ライブでないなら、判定不能でも出力は「ライブでない」と変わらない
+        print(f"[{platform}/{channel}] 判定不能 (直前もライブでないため影響なし)")
+        return None
+
+    since = prev_entry.get("stale_since") or now.isoformat()
+    since_dt = parse_iso(since) or now
+    age = int((now - since_dt).total_seconds())
+    if age >= STALE_SECONDS:
+        print(f"[{platform}/{channel}] 判定不能が{age}秒続いたためライブ表示を取り下げ")
+        return None
+
+    print(f"[{platform}/{channel}] 判定不能 — 直前のライブ状態を維持 ({age}秒経過)")
+    return dict(prev_entry, stale_since=since)
+
+
+# === 配信終了検知 ===
 def detect_ended(prev_live, live):
     """直前は配信中だったが今回は配信中でなくなった (platform, channel) の集合を返す。
 
-    注意: check_xxx_live() は「配信中でない」と「取得エラー」を区別せず両方 None を
-    返すため、一時的な通信エラーでも誤って「終了」判定される可能性がある。実害は
-    アーカイブ収集を少し早めに起動するだけ(収集側は差分が無ければ何もしない)なので、
-    ここでは簡易な判定のまま許容している。
+    判定不能 (UNKNOWN) のチャンネルは carry_over で live 側に残るため、ここには出て
+    こない = 一時的な取得エラーで誤って「終了」と判定することはない。
     """
     prev_keys = {(x.get("platform"), x.get("channel")) for x in (prev_live or [])}
     now_keys = {(x.get("platform"), x.get("channel")) for x in live}
@@ -274,6 +392,7 @@ def dispatch_ended_streams(prev_live, live):
         dispatch_workflow(repo, workflow_file)
 
 
+# === 入出力 ===
 def load_previous():
     try:
         with open(OUT_FILE, encoding="utf-8") as f:
@@ -288,38 +407,39 @@ def should_write(prev, live):
         return True, "既存ファイル無し"
     if prev.get("live") != live:
         return True, "ライブ状態が変化"
-    try:
-        prev_at = datetime.fromisoformat(prev["checked_at"])
-    except (KeyError, TypeError, ValueError):
+    prev_at = parse_iso(prev.get("checked_at"))
+    if prev_at is None:
         return True, "checked_at が不正"
-    if prev_at.tzinfo is None:
-        prev_at = prev_at.replace(tzinfo=timezone.utc)
     age = int((datetime.now(timezone.utc) - prev_at).total_seconds())
     if age >= HEARTBEAT_SECONDS:
         return True, f"heartbeat ({age}秒経過)"
     return False, "変化なし"
 
 
+def check_all():
+    """(platform, channel) をキーに全プラットフォームを判定する。出力順を固定するためリストで返す。"""
+    results = []
+    for ch in YOUTUBE_CHANNELS:
+        results.append((("youtube", ch["handle"]), check_youtube_live(ch["channel_id"], ch["handle"])))
+    results.append((("kick", KICK_CHANNEL), check_kick_live()))
+    results.append((("twitch", TWITCH_CHANNEL), check_twitch_live()))
+    return results
+
+
 def main():
     prev = load_previous()
     prev_live = prev.get("live") if isinstance(prev, dict) else None
+    now = datetime.now(timezone.utc)
 
     live = []
-    for ch in YOUTUBE_CHANNELS:
-        r = check_youtube_live(ch["channel_id"], ch["handle"])
-        if r:
-            live.append(r)
-            print(f"[youtube/{ch['handle']}] ライブ中: {r['title'][:40]}")
-
-    k = check_kick_live()
-    if k:
-        live.append(k)
-        print(f"[kick] ライブ中: {k['title'][:40]}")
-
-    t = check_twitch_live()
-    if t:
-        live.append(t)
-        print(f"[twitch] ライブ中: {t['title'][:40]}")
+    for key, result in check_all():
+        if result == UNKNOWN:
+            carried = carry_over(prev_live, key, now)
+            if carried:
+                live.append(carried)
+        elif result:
+            live.append(result)
+            print(f"[{key[0]}/{key[1]}] ライブ中: {result['title'][:40]}")
 
     dispatch_ended_streams(prev_live, live)
 
@@ -328,7 +448,7 @@ def main():
         print(f"⏭ {OUT_FILE} 据え置き ({reason} / ライブ中: {len(live)} 件)")
         return
 
-    out = {"checked_at": datetime.now(timezone.utc).isoformat(), "live": live}
+    out = {"checked_at": now.isoformat(), "live": live}
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
     print(f"📁 {OUT_FILE} 更新完了 ({reason} / ライブ中: {len(live)} 件)")

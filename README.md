@@ -28,7 +28,7 @@
   iframe化できない制約があるため、YouTube/Kick で同じ体験に揃えている）。
 - **ライブ配信中インジケーター**: YouTube 2チャンネル・Kick のいずれかが配信中の場合、
   ページ上部に目立つ「LIVE」バナーで表示（サムネ・タイトル・Kickは視聴者数）。クリックで
-  配信ページへ。5分間隔で `check_live.py`（Actions）が状態を更新し、サイト側も60秒間隔で
+  配信ページへ。1分間隔で `check_live.py`（Actions）が状態を更新し、サイト側も60秒間隔で
   ポーリングして反映する。
 
 サムネイルは YouTube が動画 ID から生成、Kick は fetcher が保存した `thumbnail`（`images.kick.com`）
@@ -48,7 +48,8 @@ JSON の `available: false` がそれを示し、サイトでは**リンクを�
 - `app.js` … 取得→正規化→統合→描画→フィルタ/検索（先頭の `CONFIG` に取得先URL等を集約）
 - `commentgraph.js` … コメント流量グラフのモーダル（取得→正規化→重複除去→1分バケット集計→描画）
 - `chart/chart.umd.js` … Chart.js 本体（ローカル同梱、CDN 依存なし）
-- `check_live.py` … YouTube/Kick のライブ判定スクリプト（Actions が5分間隔で実行）
+- `check_live.py` … YouTube/Kick/Twitch のライブ判定スクリプト（Actions が1分間隔で実行）
+- `requirements.txt` … `check_live.py` が使う yt-dlp（YouTube のライブ判定に必要）
 - `live_status.json` … `check_live.py` の出力。サイトが同一オリジンで読む
   （`{"checked_at":"...", "live":[{platform, channel, title, url, thumbnail, viewers?}]}`）
 
@@ -70,19 +71,28 @@ python -m http.server 8080
 取得先リポジトリ名/アカウントを変える場合は `app.js` 先頭の `CONFIG.sources` を修正する。
 
 Actions で `Live Status Checker` ワークフロー（`.github/workflows/live-status.yml`）が
-自動的に5分間隔で `live_status.json` を更新する（Settings → Actions → Workflow permissions
+自動的に1分間隔で `live_status.json` を更新する（Settings → Actions → Workflow permissions
 を Read and write にしておくこと）。
 
 ## ライブ判定の仕組み（`check_live.py`）
 
-- **YouTube**: `https://www.youtube.com/channel/<id>/live` を取得し `<link rel="canonical">`
-  を見る。非ライブ時はチャンネルページのまま、ライブ中は `/watch?v=<videoId>` になる。
-  タイトルは `<meta name="title">`（無ければ `<title>` タグ）から取得（このページには
-  `og:title`/`og:image` が無いため）。サムネイルは動画IDから `i.ytimg.com` の URL を直接構築。
-  yt-dlp/innertube API を使わない単純なページ取得のため、GitHub Actions のIPでも
-  bot判定を受けにくい。
-- **Kick**: `https://kick.com/api/v2/channels/<slug>` の `livestream` フィールドを見る
+- **YouTube**: yt-dlp の **flat 抽出**で `/channel/<id>/streams` タブの先頭数件を列挙し、
+  `live_status == "is_live"` があればライブ中とみなす。タイトル・動画IDも同時に取れる
+  （サムネイルは動画IDから `i.ytimg.com` の URL を直接構築）。
+  以前は `/channel/<id>/live` の HTML を読んでいたが、**GitHub Actions のランナーIPからだと
+  配信中でもライブの痕跡が返らない**ことが実測で判明した（`<link rel="canonical">` が文字列
+  `"undefined"`、視聴ページの再生情報 `videoDetails` ごと欠落。ページ自体は1.1MB前後あり
+  同意ウォールでも bot ブロックでもない＝ローカルIPからは正常。HTML をどう解析しても
+  Actions 上では判定できない）。flat 抽出（タブの一覧取得のみ／1件ずつのフル抽出はしない）は
+  youtube-comment-fetcher の meta-fetch が同じ Actions 上で常用していて bot 判定を受けて
+  いない実績があるため、こちらに寄せた。
+- **Kick**: `https://kick.com/api/v2/channels/<slug>/livestream` の `data` を見る
   （配信中はオブジェクト、非配信時は `null`）。
+- **Twitch**: Helix API の `GET /helix/streams?user_login=<login>`（`TWITCH_CLIENT_ID` /
+  `TWITCH_CLIENT_SECRET` が要る。未設定なら静かにスキップ）。
+- **判定できなかったとき**（取得エラー等）は「配信していない」とはせず、直前の状態を最大15分
+  引き継ぐ。一時的な失敗で LIVE バナーが消えたり、「配信終了」の誤検知でアーカイブ収集の
+  Actions が無駄に起動したりするのを防ぐため。
 
 ## 今後（候補）
 

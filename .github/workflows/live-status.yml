@@ -38,6 +38,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # YouTube のライブ判定に yt-dlp の flat 抽出 (/streams タブの一覧取得) を使う。
+      # ページ取得(HTML解析)は Actions のIPからだと配信中でも痕跡が返らないため
+      # 判定に使えない (check_live.py 冒頭の説明を参照)。
+      - name: Install dependencies
+        run: pip install -q -r requirements.txt
+
       - name: Check live status (1分おきにループ)
         env:
           # setup分・最後のpush分を差し引いた、job内で回せる時間(340分)。
