@@ -106,10 +106,22 @@ def check_youtube_live(channel_id, handle):
         canonical = extract_canonical(page)
         if not canonical or canonical == "undefined":
             # このcookie自体が逆に不完全なページ(canonicalが文字列"undefined"になる等)を
-            # 引き起こすことが実際に観測されている。その場合はcookie無しで再取得する。
+            # 引き起こすことがあるかもしれないので、cookie無しでも再取得してみる。
             print(f"[youtube/{handle}] canonicalが不正 ({canonical!r}) のため cookie 無しで再取得")
             page = fetch(url)
             canonical = extract_canonical(page)
+        if not canonical or canonical == "undefined":
+            # cookieの有無に関わらず不正 = cookie は原因ではない。次回の原因特定のため、
+            # ページの手がかりをできるだけ残しておく。
+            idx = page.find('href="undefined"')
+            context = page[max(0, idx - 150) : idx + 150] if idx != -1 else "(該当箇所なし)"
+            print(
+                f"[youtube/{handle}] cookie無しでも不正 (cookieは原因でない)。"
+                f"page_len={len(page)} "
+                f"has_ytInitialData={'ytInitialData' in page} "
+                f"has_consent_wall={'consent.youtube.com' in page or 'Before you continue' in page} "
+                f"context={context!r}"
+            )
     except (HTTPError, URLError) as e:
         print(f"[youtube/{handle}] 取得エラー: {e}")
         return None
