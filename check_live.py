@@ -90,6 +90,11 @@ def fetch(url, headers=None):
         return res.read().decode("utf-8", "replace")
 
 
+def extract_canonical(page):
+    m = CANONICAL_RE.search(page)
+    return m.group(1) if m else ""
+
+
 def check_youtube_live(channel_id, handle):
     url = f"https://www.youtube.com/channel/{channel_id}/live"
     try:
@@ -98,12 +103,17 @@ def check_youtube_live(channel_id, handle):
         # ならず「ライブ中でない」と誤判定することがある(既知のYouTubeスクレイピング事情)。
         # このcookieを常時付与して同意画面をスキップする。
         page = fetch(url, headers={"Cookie": "CONSENT=YES+1"})
+        canonical = extract_canonical(page)
+        if not canonical or canonical == "undefined":
+            # このcookie自体が逆に不完全なページ(canonicalが文字列"undefined"になる等)を
+            # 引き起こすことが実際に観測されている。その場合はcookie無しで再取得する。
+            print(f"[youtube/{handle}] canonicalが不正 ({canonical!r}) のため cookie 無しで再取得")
+            page = fetch(url)
+            canonical = extract_canonical(page)
     except (HTTPError, URLError) as e:
         print(f"[youtube/{handle}] 取得エラー: {e}")
         return None
 
-    m = CANONICAL_RE.search(page)
-    canonical = m.group(1) if m else ""
     if "/watch" not in canonical:
         # 誤判定の切り分け用に、何が返ってきたか分かるようにしておく
         print(f"[youtube/{handle}] ライブ中でない (canonical={canonical!r})")
