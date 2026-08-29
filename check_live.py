@@ -47,6 +47,17 @@ DISPATCH_PAT (対象repoへの Actions:write 権限を持つ PAT) が要る。�
 Actions からは 1 run のなかで 1 分おきに繰り返し呼ばれる (cron の最小粒度が5分のため)。
 そのため「変化が無いときは live_status.json を書き換えない」= commit/push しない、という
 挙動にしてある (下の should_write を参照)。
+
+GitHub の cron (schedule イベント) はこの account では当てにならない。2026-08-29 に調べた
+実測値では、各fetcherの `0 * * * *` が6〜12時間に1回しか発火せず、このワークフロー自身の
+`*/15` も間引かれてライブ判定に3〜5時間の空白ができていた (run の created_at と
+run_started_at が一致しているので、runnerの順番待ちではなくイベント自体が発火していない)。
+原因は account 全体の Actions 実行量とみられ、live_status.json のコミットのたびに走る
+pages-build-deployment が1週間で955 run に達していた。対策は2つ:
+  1. コミット頻度を落とす (should_write / SIGNIFICANT_FIELDS)
+  2. cron に頼らず、常時動いているこのループから起動する
+     - `--dispatch-archives` … 各fetcherを毎時起動 (dispatch_archives)
+     - `--dispatch-self`     … ループ終了時に次の run を起動 (dispatch_self)
 """
 
 import json
@@ -94,6 +105,15 @@ STALE_SECONDS = 900
 
 # 配信終了検知 → 起動するアーカイブ収集repoの対応表 (platform, channel) -> (repo, workflow_file)
 GITHUB_OWNER = "tourist1159"
+# 自分自身 (ループの最後に次の run を起動するため)
+SELF_REPO = "mokou-timeline"
+SELF_WORKFLOW = "live-status.yml"
+
+# 各fetcherを起動する最短間隔。前回の実行からこれ以上経っていれば起動する
+# (元の毎時cron相当。配信終了検知による起動もこの「前回の実行」に含まれる)。
+# 0 を渡すとこの定期起動を止める = 定期実行は fetcher 側の cron に任せる、という構成にできる
+# (GitHub の schedule が正常に発火するようになったらそちらの方が素直)。
+ARCHIVE_MIN_INTERVAL = int(os.environ.get("ARCHIVE_MIN_INTERVAL") or 3600)
 DISPATCH_TARGETS = {
     ("kick", KICK_CHANNEL): ("kick-comment-fetcher", "fetch.yml"),
     ("twitch", TWITCH_CHANNEL): ("twitch-archive-fetcher", "fetch.yml"),
@@ -101,10 +121,20 @@ DISPATCH_TARGETS = {
     ("youtube", "mokoustream"): ("youtube-comment-fetcher", "meta-fetch.yml"),
 }
 
-# 変化が無いのに書き換えると毎分 commit/push が走ってしまうので、状態が同じあいだは
-# ファイルに触らない。ただし完全に止めると「最後にいつ確認できたか」が分からなくなるため、
-# この秒数以上経っていれば checked_at だけの更新でも書き出す (死活確認用の heartbeat)。
-HEARTBEAT_SECONDS = 900
+# live_status.json を1回 commit するたびに Pages の再ビルド (pages-build-deployment) が
+# 走る。実測(2026-08-29 調査)では live_status.json のコミットが1日300件を超え、
+# pages-build-deployment だけで1週間 955 run に達していた。この account 全体の Actions
+# 負荷のせいで GitHub のスケジューラに cron を間引かれ、各fetcherの「毎時」cron が
+# 6〜12時間に1回しか発火しない状態になっていた (このワークフロー自身の */15 も同様で、
+# ライブ判定に3〜5時間の空白ができていた)。そのため書き出す条件を絞る:
+#   1. 意味のある変化 (配信の開始/終了、タイトルやURLの変化) → 即書き出す
+#   2. viewers やサムネURLだけの変化 (配信中は毎分変わる) → VOLATILE_WRITE_SECONDS に1回
+#   3. 何も変わらなくても HEARTBEAT_SECONDS 経過 → checked_at だけ更新 (死活確認用)
+# サイト側は checked_at も viewers も使っていない(表示は title/url/thumbnail のみ)ので、
+# 2・3 を長くしても見た目には影響しない。
+SIGNIFICANT_FIELDS = ("platform", "channel", "title", "url", "videoId")
+VOLATILE_WRITE_SECONDS = 1800
+HEARTBEAT_SECONDS = 21600
 
 # 実測の結果、/channel/<id>/live には og:title/og:image が無く、
 # <meta name="title" content="..."> と <title>...</title> のみ存在する。
@@ -392,6 +422,121 @@ def dispatch_ended_streams(prev_live, live):
         dispatch_workflow(repo, workflow_file)
 
 
+def last_run_age(repo, workflow_file):
+    """指定ワークフローの最新 run が何秒前に作られたかを返す (取れなければ None)。"""
+    pat = os.environ.get("DISPATCH_PAT")
+    if not pat:
+        return None
+    url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{repo}"
+        f"/actions/workflows/{workflow_file}/runs?per_page=1"
+    )
+    req = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {pat}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "mokou-timeline-live-status",
+        },
+    )
+    try:
+        with urlopen(req, timeout=20) as res:
+            runs = json.loads(res.read().decode("utf-8")).get("workflow_runs") or []
+    except (HTTPError, URLError, json.JSONDecodeError) as e:
+        print(f"⚠️ {repo}/{workflow_file} の最終実行時刻を取得できません: {e}")
+        return None
+    if not runs:
+        return None
+    created = parse_iso((runs[0].get("created_at") or "").replace("Z", "+00:00"))
+    if created is None:
+        return None
+    return int((datetime.now(timezone.utc) - created).total_seconds())
+
+
+def dispatch_archives(min_interval=ARCHIVE_MIN_INTERVAL):
+    """各アーカイブ収集ワークフローを、前回実行から min_interval 秒経っていれば起動する。
+
+    各fetcher側にも毎時cronはあるが、GitHub のスケジューラに間引かれて実際には
+    6〜12時間に1回しか発火しない状態になっている(2026-08-29 実測)。常時動いている
+    このループから叩けば、スケジューラの機嫌に関係なく毎時収集できる。
+
+    「ループ開始からの経過時間」ではなく「対象ワークフローの最終実行時刻」を基準に
+    するのは、この run 自体が cancel-in-progress で頻繁に作り直されるため。ループ内の
+    タイマーだと再起動のたびに0に戻ってしまい、いつまでも起動されない/されすぎる。
+    """
+    if not min_interval:
+        print("⏭ 定期起動は無効 (ARCHIVE_MIN_INTERVAL=0 / fetcher側のcronに任せる)")
+        return
+    for repo, workflow_file in sorted(set(DISPATCH_TARGETS.values())):
+        age = last_run_age(repo, workflow_file)
+        if age is not None and age < min_interval:
+            print(f"⏭ {repo}/{workflow_file} は{age}秒前に実行済み (起動しない)")
+            continue
+        if age is None:
+            print(f"[{repo}/{workflow_file}] 最終実行時刻が不明のため起動する")
+        dispatch_workflow(repo, workflow_file)
+
+
+def check_dispatch_permission():
+    """DISPATCH_PAT で各ワークフローを起動できるかを、実際には起動せずに確認する。
+
+    存在しない ref を指定して workflow_dispatch を投げると、
+      - 権限あり → 422 (No ref found for: ...) … ref が無いので run は作られない
+      - 権限なし → 403 (classic PATのスコープ不足) / 404 (fine-grained PATの対象外)
+    が返る。副作用なしで「起動できるか」だけを判定できる。
+    """
+    pat = os.environ.get("DISPATCH_PAT")
+    if not pat:
+        print("❌ DISPATCH_PAT が未設定です")
+        return
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {pat}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+        "User-Agent": "mokou-timeline-live-status",
+    }
+    # classic PAT ならスコープがヘッダで分かる (fine-grained PAT では出ない)
+    try:
+        with urlopen(Request("https://api.github.com/rate_limit", headers=headers), timeout=20) as res:
+            scopes = res.headers.get("x-oauth-scopes")
+        print(f"トークン種別: {'classic (scopes: ' + scopes + ')' if scopes else 'fine-grained もしくはスコープ非公開'}")
+    except (HTTPError, URLError) as e:
+        print(f"⚠️ トークンの確認に失敗: {e}")
+
+    targets = sorted(set(DISPATCH_TARGETS.values())) + [(SELF_REPO, SELF_WORKFLOW)]
+    for repo, workflow_file in targets:
+        url = (
+            f"https://api.github.com/repos/{GITHUB_OWNER}/{repo}"
+            f"/actions/workflows/{workflow_file}/dispatches"
+        )
+        body = json.dumps({"ref": "___permission-probe-does-not-exist___"}).encode("utf-8")
+        req = Request(url, data=body, method="POST", headers=headers)
+        try:
+            with urlopen(req, timeout=20) as res:
+                # ここに来る = 実際に起動してしまった (通常は起こらない)
+                print(f"⚠️ {repo}/{workflow_file}: HTTP {res.status} — 起動してしまった可能性あり")
+        except HTTPError as e:
+            if e.code == 422:
+                print(f"✅ {repo}/{workflow_file}: 起動できる (Actions:write あり)")
+            else:
+                print(f"❌ {repo}/{workflow_file}: HTTP {e.code} — 起動できない (権限不足かrepo対象外)")
+        except URLError as e:
+            print(f"⚠️ {repo}/{workflow_file}: 確認できず ({e.reason})")
+
+
+def dispatch_self():
+    """自分自身(live-status.yml)の次の run を起動する。
+
+    このワークフローは1 job を6時間近く回し続ける作りなので、次の run の起動を cron
+    (*/15) に頼っていた。その cron も間引かれるようになり、実測でライブ判定に3〜5時間
+    の空白ができていたため、ループの最後に自分で次を起動して数珠つなぎにする
+    (cron は数珠が切れたときの保険として残す)。
+    """
+    dispatch_workflow(SELF_REPO, SELF_WORKFLOW)
+
+
 # === 入出力 ===
 def load_previous():
     try:
@@ -401,16 +546,24 @@ def load_previous():
         return None
 
 
+def significant(live):
+    """viewers やサムネURLのような「配信中ずっと変わり続ける値」を落とした比較用の形。"""
+    return [tuple(x.get(f) for f in SIGNIFICANT_FIELDS) for x in live]
+
+
 def should_write(prev, live):
     """live_status.json を書き出すべきか (書く理由) を返す。"""
     if not isinstance(prev, dict):
         return True, "既存ファイル無し"
-    if prev.get("live") != live:
+    prev_live = prev.get("live") or []
+    if significant(prev_live) != significant(live):
         return True, "ライブ状態が変化"
     prev_at = parse_iso(prev.get("checked_at"))
     if prev_at is None:
         return True, "checked_at が不正"
     age = int((datetime.now(timezone.utc) - prev_at).total_seconds())
+    if prev_live != live and age >= VOLATILE_WRITE_SECONDS:
+        return True, f"viewers/サムネの更新 ({age}秒経過)"
     if age >= HEARTBEAT_SECONDS:
         return True, f"heartbeat ({age}秒経過)"
     return False, "変化なし"
@@ -455,4 +608,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # ライブ判定 (引数なし) 以外に、ワークフローから呼ぶ起動用のモードを持つ
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+    if mode == "--dispatch-archives":
+        dispatch_archives()
+    elif mode == "--dispatch-self":
+        dispatch_self()
+    elif mode == "--check-dispatch":
+        check_dispatch_permission()
+    else:
+        main()

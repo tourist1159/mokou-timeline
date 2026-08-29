@@ -2,13 +2,16 @@ name: Live Status Checker
 
 on:
   schedule:
-    # 実測: GitHub Actions の schedule は高頻度(5分おき)だと数十分〜1時間近く
-    # ずれ込むことがある("best effort"、公式ドキュメントにも明記されている実際の挙動)。
-    # そのためこの cron はあくまで「たまに撃ち直すきっかけ」でしかなく、実際の1分間隔
-    # ループは下の job 自体を GitHub-hosted runner の上限(6時間)近くまで長時間
-    # 走らせ続けることで実現する。cron がどれだけ遅れても、走っている job が
-    # そのあいだ1分おきにチェックし続けるので検知の隙間ができない。
-    - cron: "*/15 * * * *"
+    # cron はもう「数珠が切れたときの保険」でしかない。1分間隔のチェックは job 自体を
+    # GitHub-hosted runner の上限(6時間)近くまで走らせ続けることで実現し、次の run は
+    # ループの最後に自分で workflow_dispatch する(下の「次の run を起動」ステップ)。
+    #
+    # 以前は */15 で撃ち直していたが、この account では schedule イベントが大幅に
+    # 間引かれており(2026-08-29 実測: 1日22回程度しか発火せず、ライブ判定に3〜5時間の
+    # 空白ができていた)、cron を頼りにできない。加えて cron が発火するたびに
+    # cancel-in-progress で走行中の run が打ち切られるため、頻度が高いと逆に邪魔になる。
+    # 保険としては2時間に1回で十分。:00 は GitHub 全体で最も混む時刻なのでずらしてある。
+    - cron: "7 */2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +47,13 @@ jobs:
       - name: Install dependencies
         run: pip install -q -r requirements.txt
 
+      # DISPATCH_PAT がどのワークフローを起動できるかをログに残す。存在しない ref で
+      # workflow_dispatch を投げるだけなので、実際には何も起動しない (422が返る=権限あり)。
+      - name: DISPATCH_PAT の権限を確認 (起動はしない)
+        env:
+          DISPATCH_PAT: ${{ secrets.DISPATCH_PAT }}
+        run: python check_live.py --check-dispatch
+
       - name: Check live status (1分おきにループ)
         env:
           # setup分・最後のpush分を差し引いた、job内で回せる時間(340分)。
@@ -54,10 +64,16 @@ jobs:
           # 配信終了検知時に kick-comment-fetcher / twitch-archive-fetcher /
           # youtube-comment-fetcher の Actions を起動するための PAT (Actions:write権限、対象3repoに限定推奨)
           DISPATCH_PAT: ${{ secrets.DISPATCH_PAT }}
+          # 各fetcher(kick/twitch/youtube-meta)の起動要否を確認する間隔。実際に起動するのは
+          # 「前回の実行から1時間以上経っている」ものだけ(check_live.py の dispatch_archives)。
+          # fetcher側にも毎時cronはあるが、GitHubのスケジューラに間引かれて6〜12時間に1回しか
+          # 発火しないため、常時動いているこのループから面倒を見る。
+          ARCHIVE_CHECK_SECONDS: "600"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           start=$SECONDS
+          next_dispatch=0   # run 開始直後に1回確認する (cron の空白で溜まった分を早く回収する)
           while :; do
             python check_live.py
             git add live_status.json
@@ -69,9 +85,22 @@ jobs:
               git push
             fi
             elapsed=$(( SECONDS - start ))
+            if [ "$elapsed" -ge "$next_dispatch" ]; then
+              python check_live.py --dispatch-archives
+              next_dispatch=$(( elapsed + ARCHIVE_CHECK_SECONDS ))
+            fi
             if [ "$elapsed" -ge "$LOOP_SECONDS" ]; then
               echo "ループ終了 (${elapsed}秒) — 次の run に引き継ぐ"
               break
             fi
             sleep "$INTERVAL_SECONDS"
           done
+
+      # cron が当てにならないため、ループを最後まで回せたら次の run を自分で起動する。
+      # 打ち切られた run (cancel-in-progress で新しい run に引き継いだ場合) では起動しない
+      # ＝ 二重に走らせないため success() 限定にしている。
+      - name: 次の run を起動 (cron に頼らない数珠つなぎ)
+        if: success()
+        env:
+          DISPATCH_PAT: ${{ secrets.DISPATCH_PAT }}
+        run: python check_live.py --dispatch-self

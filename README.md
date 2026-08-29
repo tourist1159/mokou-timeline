@@ -94,6 +94,35 @@ Actions で `Live Status Checker` ワークフロー（`.github/workflows/live-s
   引き継ぐ。一時的な失敗で LIVE バナーが消えたり、「配信終了」の誤検知でアーカイブ収集の
   Actions が無駄に起動したりするのを防ぐため。
 
+## 実行スケジュール（GitHub の cron に頼らない）
+
+2026-08-29 に調べたところ、**この account では schedule イベントが大幅に間引かれていた**。
+
+| ワークフロー | 設定 | 実際の発火 |
+|---|---|---|
+| 各fetcher（kick/twitch/youtube-meta） | `0 * * * *`（毎時） | 6〜12時間に1回 |
+| Live Status Checker | `*/15`（15分毎） | 1日22回程度（ライブ判定に3〜5時間の空白） |
+
+run の `created_at` と `run_started_at` が一致している＝runner の順番待ちではなく**イベント自体が
+発火していない**。全repoが同時期（8/26頃）に悪化しているので account 単位の絞り込みとみられ、
+原因は Actions の実行量。`live_status.json` を commit するたびに Pages の再ビルドが走るため、
+`pages-build-deployment` だけで**1週間に955 run**（1日300コミット超の日もあった）に達していた。
+
+対策:
+
+1. **コミット頻度を落とす**（`check_live.py` の `should_write`）。配信中は毎分変わる `viewers` や
+   Kick のサムネURLで書き換わっていたのをやめ、**意味のある変化（配信の開始/終了・タイトル・URL）は即座、
+   viewers/サムネだけの変化は30分に1回、無変化の heartbeat は6時間に1回**に制限。サイトは
+   `checked_at` も `viewers` も使っていないので表示は変わらない。
+2. **cron に頼らず、常時動いているループから起動する**
+   - 各fetcher: ループが10分おきに「前回の実行から1時間経ったか」を GitHub API で見て、経っていれば
+     `workflow_dispatch`（`check_live.py --dispatch-archives`）。fetcher 側の毎時 cron は保険として残置。
+   - 自分自身: 6時間ループを走り切ったら次の run を自分で起動（`--dispatch-self`）して数珠つなぎにする。
+     cron は数珠が切れたときの保険として2時間に1回（`7 */2 * * *`、混雑する `:00` を避ける）。
+
+どちらも `DISPATCH_PAT`（対象repoの Actions:write）が要る。**mokou-timeline 自身への Actions:write が
+無いと数珠つなぎができない**ので、PAT のスコープに注意（無い場合は2時間 cron の保険だけで動く）。
+
 ## 今後（候補）
 
 - コメント流量グラフに埋め込みプレイヤー＋時刻クリックでシーク（YouTube のみ実現可能。
