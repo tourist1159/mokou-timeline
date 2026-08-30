@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-08-30T08:03:27.742762+00:00",
-  "live": []
+  "checked_at": "2026-08-30T08:30:00.200704+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "動画撮る",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/SDSOzSvPuKBz/720.webp?versionId=Ga1YsCb5sFJMrsaB_1BaU9OyRnZzZ7JZ",
+      "viewers": null
+    }
+  ]
 }
