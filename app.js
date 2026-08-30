@@ -566,17 +566,7 @@ function render() {
   grid.appendChild(frag);
 
   empty.hidden = list.length > 0;
-  syncPrimaryOffset();
   applyTheme();
-}
-
-// モバイルでは .controls-primary が position:fixed (デスクトップでは display:contents
-// で本来ボックスを持たないため offsetHeight は常に0、つまりここは実質ノーオペになる)。
-// フローから外れた分、body 全体を高さぶん押し下げる (site-header や controls-secondary が
-// 固定バーの下に隠れないように)。
-function syncPrimaryOffset() {
-  const primary = document.querySelector(".controls-primary");
-  document.body.style.paddingTop = primary.offsetHeight + "px";
 }
 
 /* ===== チャンネルフィルタのチップを動的生成 ===== */
@@ -728,14 +718,12 @@ function wireFilterPanel() {
   const close = () => {
     panel.classList.remove("open");
     btn.setAttribute("aria-expanded", "false");
-    syncPrimaryOffset();
   };
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     const willOpen = !panel.classList.contains("open");
     panel.classList.toggle("open", willOpen);
     btn.setAttribute("aria-expanded", String(willOpen));
-    syncPrimaryOffset();
   });
   // パネル内のチップ操作では閉じない (複数の条件を続けて選べるように)
   panel.addEventListener("click", (e) => e.stopPropagation());
@@ -751,8 +739,6 @@ async function main() {
   // 揃えておく(「読み込み中…」表示や設定パネルの見た目にも影響するため)。
   Object.assign(state, loadSettings());
   applyTheme();
-  // データ取得中の「読み込み中…」表示の間も固定バーでヘッダーが隠れないよう、先に計算しておく。
-  syncPrimaryOffset();
 
   const grid = document.getElementById("grid");
   grid.innerHTML = '<div class="loading">読み込み中…</div>';
@@ -791,10 +777,6 @@ async function main() {
   // ライブ配信中の状態は定期的にポーリングして更新する (軽量な live_status.json のみ再取得)。
   // サーバ側(Actions)が1分おきに更新するので、こちらは30秒間隔で追従する。
   setInterval(refreshLiveStatus, 30000);
-
-  // 画面回転・リサイズで .controls-primary の折り返し行数が変わることがあるため、
-  // その都度オフセットを再計算する (fixed化した高さぶんの余白の再調整)。
-  window.addEventListener("resize", syncPrimaryOffset);
 }
 
 main();

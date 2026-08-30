@@ -124,11 +124,6 @@ body {
   max-width: 1400px;
   margin: 0 auto;
 }
-/* デスクトップでは箱を作らず、中の .control-group がそのまま .controls の
-   flex-wrap に直接並ぶ (分割前と見た目が変わらないようにするため)。 */
-.controls-primary, .controls-secondary {
-  display: contents;
-}
 .control-group {
   display: flex;
   align-items: center;
@@ -600,50 +595,22 @@ body {
     width: auto;
   }
 
-  /* スクロール追従は配信元・種別 (controls-primary) だけにする。
-     チャンネル・並び・検索・表示設定 (controls-secondary) は追従させず素通りさせる。 */
+  /* 絞り込みチップを畳んだことで、追従させたいものが無くなった (以前は配信元・種別だけを
+     画面上部に position:fixed で貼り付けていた)。バーを持たず、コントロール全体を
+     ページと一緒にスクロールさせる。 */
   .controls {
-    position: static;
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0;
+    position: relative; /* 開いた絞り込みパネルの位置基準 */
+    padding: 10px 14px;
+    gap: 8px 12px;
     background: none;
     backdrop-filter: none;
-    border-bottom: none;
-    gap: 0;
-  }
-  .controls-primary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-    align-items: center;
-    /* position:sticky だと「親要素(.controls)の高さぶんしか追従できない」制約に
-       引っかかる(.controls は primary+secondary を足しても短く、grid は兄弟要素で
-       高さに含まれないため)。position:fixed ならその制約を受けずページ全体で追従する。
-       その代わりフローから外れるので、直後の .controls-secondary 側に JS で
-       (syncPrimaryOffset) このバーの高さぶんの余白を付けて隠れないようにしている。 */
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 10;
-    background: var(--controls-bg);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 14px;
-  }
-  .controls-secondary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-    align-items: center;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--border);
   }
 
-  /* 絞り込みは畳んでボタンだけ出す。開いたときは固定バーの下に重ねて出す
-     (バーの高さを変えないので、下のタイムラインが上下に動かない)。 */
+  /* 絞り込みは畳んでボタンだけ出す。ボタンは表示設定と同じ行の右端 (margin-left:auto)。
+     開いたパネルはコントロールの下に重ねて出す (コントロールの高さを変えないので、
+     下のタイムラインが上下に動かない)。 */
   .filter-btn {
+    margin-left: auto;
     display: inline-flex;
     align-items: center;
     background: transparent;
