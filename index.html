@@ -28,42 +28,47 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <header class="site-header">
     <h1>もこう アーカイブタイムライン</h1>
   </header>
 
-  <div id="live-banner" class="live-banner" hidden></div>
-
   <div class="controls">
     <!-- モバイルでは controls-primary だけスクロール追従させる (controls-secondary は追従しない)。
          デスクトップでは display:contents になり、見た目は分割前と同じ1つの並びになる。 -->
     <div class="controls-primary">
-      <div class="control-group" id="filter-platform" data-key="platform">
-        <span class="control-label">配信元</span>
-        <button class="chip active" data-value="all">すべて</button>
-        <button class="chip" data-value="youtube">YouTube</button>
-        <button class="chip" data-value="kick">Kick</button>
-        <button class="chip" data-value="twitch">Twitch</button>
-      </div>
+      <!-- 絞り込み(配信元・種別・チャンネル)はモバイルだとチップだけで画面の1/3を
+           占めてしまうため、モバイルではこのボタンで開閉する。デスクトップでは
+           ボタンを隠し、.filter-groups は display:contents で今までどおり横並びにする。 -->
+      <button class="filter-btn" id="filter-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="filter-groups">絞り込み</button>
 
-      <div class="control-group" id="filter-type" data-key="type">
-        <span class="control-label">種別</span>
-        <button class="chip active" data-value="all">すべて</button>
-        <button class="chip" data-value="stream">配信</button>
-        <button class="chip" data-value="video">動画</button>
+      <div class="filter-groups" id="filter-groups">
+        <div class="control-group" id="filter-platform" data-key="platform">
+          <span class="control-label">配信元</span>
+          <button class="chip active" data-value="all">すべて</button>
+          <button class="chip" data-value="youtube">YouTube</button>
+          <button class="chip" data-value="kick">Kick</button>
+          <button class="chip" data-value="twitch">Twitch</button>
+        </div>
+
+        <div class="control-group" id="filter-type" data-key="type">
+          <span class="control-label">種別</span>
+          <button class="chip active" data-value="all">すべて</button>
+          <button class="chip" data-value="stream">配信</button>
+          <button class="chip" data-value="video">動画</button>
+        </div>
+
+        <div class="control-group" id="filter-channel" data-key="channel">
+          <span class="control-label">チャンネル</span>
+          <button class="chip active" data-value="all">すべて</button>
+          <!-- チャンネルのチップは app.js が動的に追加 -->
+        </div>
       </div>
     </div>
 
     <div class="controls-secondary">
-      <div class="control-group" id="filter-channel" data-key="channel">
-        <span class="control-label">チャンネル</span>
-        <button class="chip active" data-value="all">すべて</button>
-        <!-- チャンネルのチップは app.js が動的に追加 -->
-      </div>
-
       <div class="control-group">
         <span class="control-label">並び</span>
         <button class="chip active" id="sort-toggle" data-order="desc">新しい順</button>
@@ -121,7 +126,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
   <script src="commentgraph.js?v=8"></script>
 </body>
 </html>

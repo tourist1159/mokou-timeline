@@ -161,6 +161,12 @@ body {
 }
 .search-group { flex: 1 1 200px; justify-content: flex-end; }
 
+/* ---- 絞り込み(配信元・種別・チャンネル) ---- */
+/* デスクトップでは開閉ボタンを出さず、3つの control-group が今までどおり
+   .controls の flex 並びに直接乗る (display:contents)。 */
+.filter-btn { display: none; }
+.filter-groups { display: contents; }
+
 /* ---- 表示設定パネル ---- */
 .settings-group { position: relative; }
 .settings-btn {
@@ -634,96 +640,87 @@ body {
     padding: 10px 14px;
     border-bottom: 1px solid var(--border);
   }
+
+  /* 絞り込みは畳んでボタンだけ出す。開いたときは固定バーの下に重ねて出す
+     (バーの高さを変えないので、下のタイムラインが上下に動かない)。 */
+  .filter-btn {
+    display: inline-flex;
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 5px 13px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .filter-btn::before { content: "🔎"; margin-right: 5px; }
+  .filter-btn.has-filter {
+    border-color: var(--text);
+    font-weight: 600;
+  }
+  .filter-groups { display: none; }
+  .filter-groups.open {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 12px 14px;
+    /* 下のタイムラインに重ねるので、--controls-bg (半透明) ではなく不透明な面色にする。
+       半透明だと後ろのカードやヘッダーの文字が透けて読めなくなる。 */
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 20;
+  }
 }
 
-/* ---- Live now banner ---- */
-.live-banner {
-  max-width: 1400px;
-  margin: 0 auto;
-  /* 上は枠からはみ出す LIVE バッジ用の余白 */
-  padding: 12px 20px 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.live-card {
-  /* LIVE バッジ(枠に重ねる)とサムネ内バッジの位置基準 */
+/* ---- 配信中のカード (タイムラインの中に他のカードと同じ形で並ぶ) ---- */
+.card.live {
+  /* 通常カードは1px。ライブだけ赤枠+グローで目立たせる。枠が太くなるぶんの
+     ガタつきを避けるため、border-width の差は margin で吸収する。 */
   position: relative;
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  background: var(--surface);
   border: 2px solid #ff3d3d;
-  border-radius: var(--radius);
-  padding: 12px;
-  text-decoration: none;
-  color: inherit;
-  /* 1枠だけのときは大きく伸ばし、複数配信中のときは横に並べる */
-  flex: 1 1 420px;
-  max-width: 640px;
-  box-shadow: 0 0 24px rgba(255, 61, 61, 0.18);
-  transition: transform 0.12s, box-shadow 0.12s;
+  margin: -1px;
+  box-shadow: 0 0 20px rgba(255, 61, 61, 0.18);
+  overflow: visible; /* LIVE バッジを枠の外にはみ出させるため */
 }
-.live-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 28px rgba(255, 61, 61, 0.35);
+.card.live:hover {
+  border-color: #ff3d3d;
+  box-shadow: 0 0 26px rgba(255, 61, 61, 0.35);
 }
-.live-thumb {
-  position: relative;
-  flex: 0 0 200px;
-  width: 200px;
-  aspect-ratio: 16 / 9;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--surface-2);
+/* 角丸が overflow:visible で効かなくなるぶんはサムネ側で丸める */
+.card.live .thumb {
+  border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;
 }
-.live-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.live-thumb .thumb-ph { font-size: 1.8rem; }
 /* LIVE はサムネ内ではなくカード上辺の赤枠に重ねる */
 .live-dot {
   position: absolute;
   top: 0;
-  left: 18px;
+  left: 14px;
   transform: translateY(-50%);
   background: #ff3d3d;
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  padding: 3px 12px;
+  padding: 2px 10px;
   border-radius: 999px;
   animation: live-pulse 1.6s ease-in-out infinite;
+  z-index: 1;
 }
 @keyframes live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
-.live-info { min-width: 0; flex: 1; }
-.live-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.live-meta {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-/* 上の @media (max-width:600px) ブロックより後ろに書くこと。同じ詳細度なので
-   先に書くと、この下のライブ用ベース指定に上書きされてモバイル指定が効かない。 */
-@media (max-width: 600px) {
-  /* 狭い画面ではサムネを縮めてタイトルに幅を回す (大きさは赤枠とタイトルで主張させる) */
-  .live-banner { padding: 12px 14px 14px; gap: 12px; }
-  .live-card { flex-basis: 100%; gap: 10px; padding: 10px; }
-  .live-thumb { flex: 0 0 140px; width: 140px; }
-  .live-thumb .thumb-ph { font-size: 1.4rem; }
-  .live-title { font-size: 0.95rem; -webkit-line-clamp: 2; }
-  .live-dot { left: 12px; font-size: 0.66rem; padding: 2px 10px; }
+/* リスト表示ではサムネが左側なので、丸めるのは左の角 */
+#grid.view-list .card.live .thumb,
+.date-items.view-list .card.live .thumb {
+  border-radius: calc(var(--radius) - 2px) 0 0 calc(var(--radius) - 2px);
 }

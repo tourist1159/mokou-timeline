@@ -274,9 +274,38 @@ async function loadData() {
 }
 
 /* ===== フィルタ & 描画 ===== */
+// 配信中のものを、タイムラインのカードと同じ形に変換する。live_status.json には開始時刻が
+// 無いので start は「今」= 常に一番新しい扱いにする(降順なら先頭、昇順なら末尾に並ぶ)。
+// 前回訪問時に見えていたはずがないので isNew は true (新着境界の計算もこれで整合する)。
+function liveItems() {
+  const now = new Date();
+  return LIVE.map((v) => ({
+    platform: v.platform,
+    channel: v.channel,
+    type: "stream",
+    title: v.title || "",
+    url: v.url,
+    videoId: v.videoId || null,
+    start: now,
+    durationSec: 0,
+    lengthStr: "",
+    comments: null,
+    thumbnail: v.thumbnail || null,
+    available: true,
+    commentsKey: null,
+    isNew: true,
+    isLive: true,
+  }));
+}
+
 function applyFilters() {
   const q = normalizeText(state.q);
-  let list = ALL.filter((x) => {
+  const live = liveItems();
+  // 配信終了直後は、アーカイブ側にも同じ動画が載っていることがある(収集の方が早い場合)。
+  // その場合はライブ側を優先して重複を消す。
+  const liveIds = new Set(live.map((x) => `${x.platform}:${x.videoId}`).filter((k) => !k.endsWith(":null")));
+  let list = [...live, ...ALL].filter((x) => {
+    if (!x.isLive && liveIds.has(`${x.platform}:${x.videoId}`)) return false;
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
@@ -318,10 +347,13 @@ function makeThumb(item) {
   badge.textContent = platformLabel(item.platform);
   wrap.appendChild(badge);
 
-  const dur = document.createElement("span");
-  dur.className = "duration";
-  dur.textContent = fmtDuration(item.durationSec, item.lengthStr);
-  wrap.appendChild(dur);
+  // 配信中は長さが確定していないので出さない (0 のまま出すと "00:00" になる)
+  if (!item.isLive) {
+    const dur = document.createElement("span");
+    dur.className = "duration";
+    dur.textContent = fmtDuration(item.durationSec, item.lengthStr);
+    wrap.appendChild(dur);
+  }
 
   return wrap;
 }
@@ -338,6 +370,7 @@ function makeCard(item) {
   // 削除済みの動画はリンクにしない (クリックしても404になるだけのため)
   const card = document.createElement(item.available ? "a" : "div");
   card.className = item.available ? "card" : "card unavailable";
+  if (item.isLive) card.classList.add("live");
   if (item.available) {
     card.href = item.url;
     card.target = "_blank";
@@ -347,6 +380,14 @@ function makeCard(item) {
   }
 
   card.appendChild(makeThumb(item));
+
+  // 配信中はカードの赤枠の上に LIVE バッジを重ねる
+  if (item.isLive) {
+    const dot = document.createElement("span");
+    dot.className = "live-dot";
+    dot.textContent = "LIVE";
+    card.appendChild(dot);
+  }
 
   const body = document.createElement("div");
   body.className = "card-body";
@@ -361,16 +402,9 @@ function makeCard(item) {
 
   const date = document.createElement("span");
   date.className = "card-date";
-  date.textContent = fmtDate(item.start);
+  // 配信中は開始時刻を持っていない (start は並べ替え用の「今」) ので日時は出さない
+  date.textContent = item.isLive ? "配信中" : fmtDate(item.start);
   meta.appendChild(date);
-
-  // チャンネル名はYouTubeのみ表示 (2チャンネルあり区別が要る。Kick/Twitchは単一チャンネルのため不要)
-  if (item.platform === "youtube") {
-    const chTag = document.createElement("span");
-    chTag.className = "tag";
-    chTag.textContent = channelLabel(item.channel);
-    meta.appendChild(chTag);
-  }
 
   const typeTag = document.createElement("span");
   typeTag.className = "tag " + item.type;
@@ -412,75 +446,17 @@ function makeCard(item) {
   return card;
 }
 
-/* ===== ライブ配信中バナー ===== */
-function makeLiveCard(item) {
-  const card = document.createElement("a");
-  card.className = "live-card";
-  card.href = item.url;
-  card.target = "_blank";
-  card.rel = "noopener noreferrer";
-
-  const thumb = document.createElement("div");
-  thumb.className = "live-thumb";
-  if (item.thumbnail) {
-    const img = document.createElement("img");
-    img.loading = "lazy";
-    img.alt = "";
-    img.src = item.thumbnail;
-    // サムネが取れないときは通常カードと同じプレースホルダーに差し替える
-    img.onerror = () => thumb.replaceChild(makePlaceholder(item), img);
-    thumb.appendChild(img);
-  } else {
-    thumb.appendChild(makePlaceholder(item));
-  }
-  // 配信媒体は通常の動画カードと同じくサムネイル内に出す (.badge-platform を流用)
-  const platformSpan = document.createElement("span");
-  platformSpan.className = "badge-platform " + item.platform;
-  platformSpan.textContent = platformLabel(item.platform);
-  thumb.appendChild(platformSpan);
-  card.appendChild(thumb);
-
-  const info = document.createElement("div");
-  info.className = "live-info";
-  const title = document.createElement("div");
-  title.className = "live-title";
-  title.textContent = item.title;
-  info.appendChild(title);
-
-  const meta = document.createElement("div");
-  meta.className = "live-meta";
-  const chSpan = document.createElement("span");
-  chSpan.textContent = channelLabel(item.channel);
-  meta.appendChild(chSpan);
-  info.appendChild(meta);
-  card.appendChild(info);
-
-  // LIVE バッジはサムネ内ではなくカードの赤枠の上に重ねる (枠に貼り付いたラベルの見た目)
-  const dot = document.createElement("span");
-  dot.className = "live-dot";
-  dot.textContent = "LIVE";
-  card.appendChild(dot);
-
-  return card;
-}
-
-function renderLiveBanner() {
-  const el = document.getElementById("live-banner");
-  el.textContent = "";
-  if (!LIVE.length) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  const frag = document.createDocumentFragment();
-  for (const item of LIVE) frag.appendChild(makeLiveCard(item));
-  el.appendChild(frag);
-}
-
+/* ===== ライブ配信中 ===== */
 // GitHub Pages は CDN(Fastly)側でも数分キャッシュされるため、cache:"no-cache" だけでは
 // 古い live_status.json を掴まされることがある。クエリを毎回変えてキャッシュキーをずらす。
 function liveStatusUrl() {
   return `${CONFIG.sources.liveStatus}?t=${Date.now()}`;
+}
+
+// 再描画の要否を判定するためのキー。viewers やサムネURLは配信中ずっと変わり続けるが
+// カードには出していないので、これらの変化では作り直さない(スクロール位置を保つため)。
+function liveKey(list) {
+  return (list || []).map((x) => `${x.platform}:${x.channel}:${x.url}:${x.title}`).join("|");
 }
 
 async function refreshLiveStatus() {
@@ -488,8 +464,10 @@ async function refreshLiveStatus() {
     const r = await fetch(liveStatusUrl(), { cache: "no-cache" });
     if (!r.ok) return;
     const data = await r.json();
-    LIVE = data.live || [];
-    renderLiveBanner();
+    const next = data.live || [];
+    const changed = liveKey(next) !== liveKey(LIVE);
+    LIVE = next;
+    if (changed) render();
   } catch (e) {
     // 次回のポーリングで回復するため、ここでは何もしない
   }
@@ -644,6 +622,16 @@ function syncChipUI() {
   st.textContent = state.order === "desc" ? "新しい順" : "古い順";
   st.classList.add("active");
   document.getElementById("search").value = state.q;
+  syncFilterButton();
+}
+
+// モバイルでは絞り込みチップが畳まれていて見えないので、いくつ効いているかをボタンに出す。
+function syncFilterButton() {
+  const btn = document.getElementById("filter-toggle");
+  if (!btn) return;
+  const active = ["platform", "type", "channel"].filter((k) => state[k] !== "all").length;
+  btn.textContent = active ? `絞り込み (${active})` : "絞り込み";
+  btn.classList.toggle("has-filter", active > 0);
 }
 
 /* ===== 表示設定パネルの見た目を状態に同期 ===== */
@@ -733,6 +721,29 @@ function wireSettingsPanel() {
   });
 }
 
+/* ===== 絞り込みパネル (モバイルのみ開閉。デスクトップは常時表示) ===== */
+function wireFilterPanel() {
+  const btn = document.getElementById("filter-toggle");
+  const panel = document.getElementById("filter-groups");
+  const close = () => {
+    panel.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+    syncPrimaryOffset();
+  };
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = !panel.classList.contains("open");
+    panel.classList.toggle("open", willOpen);
+    btn.setAttribute("aria-expanded", String(willOpen));
+    syncPrimaryOffset();
+  });
+  // パネル内のチップ操作では閉じない (複数の条件を続けて選べるように)
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => {
+    if (panel.classList.contains("open")) close();
+  });
+}
+
 /* ===== 起動 ===== */
 async function main() {
   // 表示設定(テーマ含む)はデータ取得を待たず先に読み込む。テーマ自体は index.html
@@ -763,7 +774,7 @@ async function main() {
   syncSettingsUI();
   wireEvents();
   wireSettingsPanel();
-  renderLiveBanner();
+  wireFilterPanel();
   render();
 
   if (failed.length) {
