@@ -422,8 +422,14 @@ def dispatch_ended_streams(prev_live, live):
         dispatch_workflow(repo, workflow_file)
 
 
-def last_run_age(repo, workflow_file):
-    """指定ワークフローの最新 run が何秒前に作られたかを返す (取れなければ None)。"""
+def latest_run(repo, workflow_file):
+    """指定ワークフローの最新 run の (作成から何秒経ったか, status) を返す。取れなければ None。
+
+    status は "completed" / "in_progress" / "queued" 等。まだ終わっていない run がある
+    ときに新しく起動すると、両者が同じファイルを書いて git push で衝突する
+    (実測: Kick のコメント取得は4時間の配信で80分かかり、その最中に起動した run と
+    kick_archives.json がコンフリクトして失敗した)。
+    """
     pat = os.environ.get("DISPATCH_PAT")
     if not pat:
         return None
@@ -444,14 +450,15 @@ def last_run_age(repo, workflow_file):
         with urlopen(req, timeout=20) as res:
             runs = json.loads(res.read().decode("utf-8")).get("workflow_runs") or []
     except (HTTPError, URLError, json.JSONDecodeError) as e:
-        print(f"⚠️ {repo}/{workflow_file} の最終実行時刻を取得できません: {e}")
+        print(f"⚠️ {repo}/{workflow_file} の最終実行状況を取得できません: {e}")
         return None
     if not runs:
         return None
     created = parse_iso((runs[0].get("created_at") or "").replace("Z", "+00:00"))
     if created is None:
         return None
-    return int((datetime.now(timezone.utc) - created).total_seconds())
+    age = int((datetime.now(timezone.utc) - created).total_seconds())
+    return age, runs[0].get("status")
 
 
 def dispatch_archives(min_interval=ARCHIVE_MIN_INTERVAL):
@@ -469,12 +476,19 @@ def dispatch_archives(min_interval=ARCHIVE_MIN_INTERVAL):
         print("⏭ 定期起動は無効 (ARCHIVE_MIN_INTERVAL=0 / fetcher側のcronに任せる)")
         return
     for repo, workflow_file in sorted(set(DISPATCH_TARGETS.values())):
-        age = last_run_age(repo, workflow_file)
-        if age is not None and age < min_interval:
+        info = latest_run(repo, workflow_file)
+        if info is None:
+            print(f"[{repo}/{workflow_file}] 最終実行状況が不明のため起動する")
+            dispatch_workflow(repo, workflow_file)
+            continue
+        age, status = info
+        if status != "completed":
+            # まだ動いている run に被せない (Kick のコメント取得は長い配信だと1時間を超える)
+            print(f"⏭ {repo}/{workflow_file} は実行中 ({status} / {age}秒前に開始)")
+            continue
+        if age < min_interval:
             print(f"⏭ {repo}/{workflow_file} は{age}秒前に実行済み (起動しない)")
             continue
-        if age is None:
-            print(f"[{repo}/{workflow_file}] 最終実行時刻が不明のため起動する")
         dispatch_workflow(repo, workflow_file)
 
 
