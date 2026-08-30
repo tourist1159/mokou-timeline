@@ -202,6 +202,8 @@ function normalizeYouTube(arr) {
     // 再生数。meta fetcher が12時間ごとに取り直すので最大12時間ぶん古い概数。
     // YouTube のみ (Kick/Twitch は未対応なので null → 表示しない)
     views: typeof v.view_count === "number" ? v.view_count : null,
+    // メンバー限定配信 (YouTube は再生数も公開していないので views は null になる)
+    membersOnly: v.members_only === true,
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
     available: v.available !== false, // フラグ未設定は視聴可能とみなす
     commentsKey: v.video_id, // comments_github/<commentsKey>_comments.json
@@ -426,6 +428,14 @@ function makeCard(item) {
   typeTag.className = "tag " + item.type;
   typeTag.textContent = item.type === "stream" ? "配信" : "動画";
   meta.appendChild(typeTag);
+
+  if (item.membersOnly) {
+    const m = document.createElement("span");
+    m.className = "tag members";
+    m.textContent = "メンバー限定";
+    m.title = "チャンネルメンバーのみ視聴できます";
+    meta.appendChild(m);
+  }
 
   if (item.views != null) {
     const v = document.createElement("span");

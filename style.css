@@ -23,6 +23,9 @@
   --tag-video-border: rgba(26, 95, 180, 0.32);
   --tag-deleted-color: #9a5b00;
   --tag-deleted-border: rgba(154, 91, 0, 0.35);
+  /* メンバー限定 (YouTube のメンバーシップ色に寄せた緑) */
+  --tag-members-color: #0f7b3f;
+  --tag-members-border: rgba(15, 123, 63, 0.35);
   --notice-color: #8a5a00;
 
   --yt: #ff3d3d;
@@ -52,6 +55,8 @@
     --tag-video-border: rgba(62, 166, 255, 0.4);
     --tag-deleted-color: #ffb066;
     --tag-deleted-border: rgba(255, 150, 60, 0.45);
+    --tag-members-color: #6ee7a0;
+    --tag-members-border: rgba(110, 231, 160, 0.35);
     --notice-color: #ffcf66;
   }
 }
@@ -83,6 +88,8 @@
   --tag-video-border: rgba(62, 166, 255, 0.4);
   --tag-deleted-color: #ffb066;
   --tag-deleted-border: rgba(255, 150, 60, 0.45);
+  --tag-members-color: #6ee7a0;
+  --tag-members-border: rgba(110, 231, 160, 0.35);
   --notice-color: #ffcf66;
 }
 
@@ -425,6 +432,7 @@ body {
 .tag.stream { color: var(--tag-stream-color); border-color: var(--tag-stream-border); }
 .tag.video { color: var(--tag-video-color); border-color: var(--tag-video-border); }
 .tag.deleted { color: var(--tag-deleted-color); border-color: var(--tag-deleted-border); }
+.tag.members { color: var(--tag-members-color); border-color: var(--tag-members-border); }
 
 /* 配信元で削除された動画 (情報は残すがリンクはしない) */
 .card.unavailable { opacity: 0.5; cursor: default; }
