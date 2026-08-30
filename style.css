@@ -640,48 +640,58 @@ body {
 .live-banner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px 14px;
+  /* 上は枠からはみ出す LIVE バッジ用の余白 */
+  padding: 12px 20px 16px;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
 }
 .live-card {
+  /* LIVE バッジ(枠に重ねる)とサムネ内バッジの位置基準 */
+  position: relative;
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: center;
   background: var(--surface);
-  border: 1px solid #ff3d3d55;
+  border: 2px solid #ff3d3d;
   border-radius: var(--radius);
-  padding: 8px;
+  padding: 12px;
   text-decoration: none;
   color: inherit;
-  width: 320px;
-  max-width: 100%;
-  box-shadow: 0 0 0 1px transparent, 0 0 16px rgba(255, 61, 61, 0.12);
-  transition: transform 0.12s, border-color 0.12s;
+  /* 1枠だけのときは大きく伸ばし、複数配信中のときは横に並べる */
+  flex: 1 1 420px;
+  max-width: 640px;
+  box-shadow: 0 0 24px rgba(255, 61, 61, 0.18);
+  transition: transform 0.12s, box-shadow 0.12s;
 }
-.live-card:hover { transform: translateY(-2px); border-color: #ff3d3d; }
+.live-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 28px rgba(255, 61, 61, 0.35);
+}
 .live-thumb {
   position: relative;
-  flex: 0 0 96px;
-  width: 96px;
+  flex: 0 0 200px;
+  width: 200px;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
   overflow: hidden;
   background: var(--surface-2);
 }
 .live-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.live-thumb .thumb-ph { font-size: 1.8rem; }
+/* LIVE はサムネ内ではなくカード上辺の赤枠に重ねる */
 .live-dot {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: 0;
+  left: 18px;
+  transform: translateY(-50%);
   background: #ff3d3d;
   color: #fff;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  padding: 1px 6px;
-  border-radius: 4px;
+  letter-spacing: 0.1em;
+  padding: 3px 12px;
+  border-radius: 999px;
   animation: live-pulse 1.6s ease-in-out infinite;
 }
 @keyframes live-pulse {
@@ -690,18 +700,30 @@ body {
 }
 .live-info { min-width: 0; flex: 1; }
 .live-title {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .live-meta {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
+}
+/* 上の @media (max-width:600px) ブロックより後ろに書くこと。同じ詳細度なので
+   先に書くと、この下のライブ用ベース指定に上書きされてモバイル指定が効かない。 */
+@media (max-width: 600px) {
+  /* 狭い画面ではサムネを縮めてタイトルに幅を回す (大きさは赤枠とタイトルで主張させる) */
+  .live-banner { padding: 12px 14px 14px; gap: 12px; }
+  .live-card { flex-basis: 100%; gap: 10px; padding: 10px; }
+  .live-thumb { flex: 0 0 140px; width: 140px; }
+  .live-thumb .thumb-ph { font-size: 1.4rem; }
+  .live-title { font-size: 0.95rem; -webkit-line-clamp: 2; }
+  .live-dot { left: 12px; font-size: 0.66rem; padding: 2px 10px; }
 }

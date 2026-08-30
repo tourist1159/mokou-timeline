@@ -427,13 +427,17 @@ function makeLiveCard(item) {
     img.loading = "lazy";
     img.alt = "";
     img.src = item.thumbnail;
-    img.onerror = () => img.remove();
+    // サムネが取れないときは通常カードと同じプレースホルダーに差し替える
+    img.onerror = () => thumb.replaceChild(makePlaceholder(item), img);
     thumb.appendChild(img);
+  } else {
+    thumb.appendChild(makePlaceholder(item));
   }
-  const dot = document.createElement("span");
-  dot.className = "live-dot";
-  dot.textContent = "LIVE";
-  thumb.appendChild(dot);
+  // 配信媒体は通常の動画カードと同じくサムネイル内に出す (.badge-platform を流用)
+  const platformSpan = document.createElement("span");
+  platformSpan.className = "badge-platform " + item.platform;
+  platformSpan.textContent = platformLabel(item.platform);
+  thumb.appendChild(platformSpan);
   card.appendChild(thumb);
 
   const info = document.createElement("div");
@@ -445,15 +449,17 @@ function makeLiveCard(item) {
 
   const meta = document.createElement("div");
   meta.className = "live-meta";
-  const platformSpan = document.createElement("span");
-  platformSpan.className = "badge-platform " + item.platform;
-  platformSpan.textContent = platformLabel(item.platform);
-  meta.appendChild(platformSpan);
   const chSpan = document.createElement("span");
   chSpan.textContent = channelLabel(item.channel);
   meta.appendChild(chSpan);
   info.appendChild(meta);
   card.appendChild(info);
+
+  // LIVE バッジはサムネ内ではなくカードの赤枠の上に重ねる (枠に貼り付いたラベルの見た目)
+  const dot = document.createElement("span");
+  dot.className = "live-dot";
+  dot.textContent = "LIVE";
+  card.appendChild(dot);
 
   return card;
 }
