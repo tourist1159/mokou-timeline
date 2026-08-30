@@ -168,6 +168,14 @@ function fmtDuration(sec, lengthStr) {
   const p = (n) => String(n).padStart(2, "0");
   return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
 }
+// 再生数は概数で出す (12時間ごとの更新なので下の桁に意味が無い)。
+// YouTube の日本語表記に合わせて 1万以上は「◯.◯万」、それ未満はカンマ区切り。
+function fmtViews(n) {
+  if (typeof n !== "number" || !isFinite(n)) return "";
+  if (n >= 100000000) return `${(n / 100000000).toFixed(1).replace(/\.0$/, "")}億`;
+  if (n >= 10000) return `${(n / 10000).toFixed(1).replace(/\.0$/, "")}万`;
+  return n.toLocaleString();
+}
 function normalizeText(t) {
   return (t || "").toLowerCase().replace(/[！!？?\s]/g, "").normalize("NFKC");
 }
@@ -191,6 +199,9 @@ function normalizeYouTube(arr) {
     durationSec: v.duration || 0,
     lengthStr: v.video_length || "",
     comments: typeof v.number_of_comments === "number" ? v.number_of_comments : null,
+    // 再生数。meta fetcher が12時間ごとに取り直すので最大12時間ぶん古い概数。
+    // YouTube のみ (Kick/Twitch は未対応なので null → 表示しない)
+    views: typeof v.view_count === "number" ? v.view_count : null,
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
     available: v.available !== false, // フラグ未設定は視聴可能とみなす
     commentsKey: v.video_id, // comments_github/<commentsKey>_comments.json
@@ -301,11 +312,16 @@ function liveItems() {
 function applyFilters() {
   const q = normalizeText(state.q);
   const live = liveItems();
-  // 配信終了直後は、アーカイブ側にも同じ動画が載っていることがある(収集の方が早い場合)。
-  // その場合はライブ側を優先して重複を消す。
+  // 同じ配信がアーカイブ側にも載っていることがある。Kick は配信中からVODが作られるため
+  // 常に、YouTube は配信終了直後(収集がライブ判定より早いとき)に起きる。ライブ側を優先する。
+  // 突き合わせは videoId (取れる場合) と、「同じ配信元・チャンネルで同じタイトル かつ
+  // 24時間以内に始まった」の2通り (Kick のライブ判定は videoId を持たないため)。
   const liveIds = new Set(live.map((x) => `${x.platform}:${x.videoId}`).filter((k) => !k.endsWith(":null")));
+  const liveTitles = new Set(live.map((x) => `${x.platform}|${x.channel}|${x.title}`));
+  const dayAgo = Date.now() - 86400000;
   let list = [...live, ...ALL].filter((x) => {
     if (!x.isLive && liveIds.has(`${x.platform}:${x.videoId}`)) return false;
+    if (!x.isLive && x.start >= dayAgo && liveTitles.has(`${x.platform}|${x.channel}|${x.title}`)) return false;
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
@@ -410,6 +426,14 @@ function makeCard(item) {
   typeTag.className = "tag " + item.type;
   typeTag.textContent = item.type === "stream" ? "配信" : "動画";
   meta.appendChild(typeTag);
+
+  if (item.views != null) {
+    const v = document.createElement("span");
+    v.className = "views";
+    v.textContent = fmtViews(item.views);
+    v.title = `${item.views.toLocaleString()}回視聴`;
+    meta.appendChild(v);
+  }
 
   if (state.showComments && item.comments != null) {
     const c = document.createElement("span");

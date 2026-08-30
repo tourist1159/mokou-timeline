@@ -432,6 +432,8 @@ body {
 .card.unavailable .thumb { filter: grayscale(1); }
 .card-date { width: 100%; }
 .comments::before { content: "💬 "; }
+/* 再生数 (YouTubeのみ。12時間ごとに更新される概数) */
+.views::before { content: "👁 "; }
 
 /* ---- Comment graph modal ---- */
 .graph-modal-backdrop {
