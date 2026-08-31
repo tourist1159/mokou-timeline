@@ -432,7 +432,7 @@ function makeCard(item) {
   if (item.membersOnly) {
     const m = document.createElement("span");
     m.className = "tag members";
-    m.textContent = "メンバー限定";
+    m.textContent = "メン限";
     m.title = "チャンネルメンバーのみ視聴できます";
     meta.appendChild(m);
   }
