@@ -527,6 +527,94 @@ body {
 }
 .graph-modal-link:hover { text-decoration: underline; }
 
+/* ---- キーワード集計の編集パネル ---- */
+.keyword-editor {
+  border-bottom: 1px solid var(--border);
+  /* 開閉のたびにパネル全体の高さが変わるとグラフの位置がガタつくので、
+     開いていても最大高さを決めてスクロールさせる。 */
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.keyword-editor-summary {
+  cursor: pointer;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  list-style: none;
+  user-select: none;
+}
+.keyword-editor-summary::-webkit-details-marker { display: none; }
+.keyword-editor-summary::before { content: "▸ "; }
+.keyword-editor[open] .keyword-editor-summary::before { content: "▾ "; }
+.keyword-editor-summary:hover { color: var(--text); }
+.keyword-editor-body {
+  padding: 0 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.keyword-editor-hint {
+  margin: 0 0 2px;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.keyword-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.keyword-color-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.keyword-editor-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+}
+.keyword-editor-input:focus { border-color: var(--accent); }
+.keyword-editor-input.invalid { border-color: var(--tag-deleted-color); }
+.keyword-remove-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.keyword-remove-btn:hover { background: var(--surface-2); color: var(--text); }
+.keyword-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.keyword-add-btn, .keyword-reset-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.keyword-add-btn:hover, .keyword-reset-btn:hover { background: var(--surface-2); }
+
 /* ---- List view ---- */
 #grid.view-list {
   display: flex;

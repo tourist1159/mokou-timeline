@@ -6,13 +6,48 @@
  * 集計ロジックは拡張機能 sortcomments/commentgraph.js・kick-extension/js/commentchart.js の
  * 移植（重複除去→1分バケット→キーワード別カウント）。埋め込みプレイヤーは持たないため
  * currentTime連動やクリックシークは無い。
+ *
+ * キーワードはモーダル内の「キーワード集計」パネルでユーザーが編集でき、
+ * localStorage (KEYWORDS_KEY) に保存して次回以降も使う。正規表現1件ずつを別の入力欄に
+ * するのは、"8{3,}" のようなパターン自体にカンマを含むものがあり、カンマ区切りの
+ * 1本の文字列では表現できないため。
  */
 
-const GRAPH_KEYWORDS = ["草|w", "8{3,}", "^あ+$"];
+const KEYWORDS_KEY = "mokou-timeline:keywords";
+const DEFAULT_KEYWORDS = ["草|w", "8{3,}", "^あ+$"];
 // ダーク背景向けの原色はライトテーマの白背景では視認性が落ちる(特に cyan)ため、
-// テーマごとに別の色セットを用意する (chartPalette 参照)。
-const GRAPH_KEYWORD_COLORS_DARK = ["red", "orange", "cyan"];
-const GRAPH_KEYWORD_COLORS_LIGHT = ["#c0392b", "#a06a00", "#0e7490"];
+// テーマごとに別の色セットを用意する (chartPalette 参照)。キーワード数がこれより
+// 多い場合は色を使い回す (renderChart/renderKeywordRows で % による循環)。
+const GRAPH_KEYWORD_COLORS_DARK = ["red", "orange", "cyan", "violet", "gold", "deeppink"];
+const GRAPH_KEYWORD_COLORS_LIGHT = ["#c0392b", "#a06a00", "#0e7490", "#7c3aed", "#8a6d00", "#c2185b"];
+
+function loadKeywords() {
+  try {
+    const raw = localStorage.getItem(KEYWORDS_KEY);
+    if (!raw) return [...DEFAULT_KEYWORDS];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.map(String) : [...DEFAULT_KEYWORDS];
+  } catch (e) {
+    return [...DEFAULT_KEYWORDS];
+  }
+}
+function saveKeywords(keywords) {
+  try {
+    localStorage.setItem(KEYWORDS_KEY, JSON.stringify(keywords));
+  } catch (e) {
+    // プライベートブラウジング等で保存できなくても、セッション内の表示自体は継続する
+  }
+}
+function isValidRegex(pattern) {
+  try {
+    new RegExp(pattern, "gi");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+let currentKeywords = loadKeywords();
 
 // resolvedTheme() は app.js 側で定義 (commentgraph.js は app.js の後に読み込まれる)。
 function chartPalette() {
@@ -32,6 +67,11 @@ const COMMENTS_BASE = {
 let modalEls = null; // 初回オープン時に生成して使い回す
 let currentChart = null;
 let requestSeq = 0; // 連打時、古いレスポンスの描画を防ぐ
+// キーワード編集時の再集計 (rerenderChart) 用。現在開いているグラフの重複除去済み
+// コメントと配信長を持つ (モーダルを閉じたら closeCommentGraph が null に戻す)。
+let lastFiltered = null;
+let lastOffsetSec = null;
+let lastItem = null;
 
 function buildModal() {
   const backdrop = document.createElement("div");
@@ -59,6 +99,8 @@ function buildModal() {
   header.appendChild(title);
   header.appendChild(closeBtn);
 
+  const keywordEditor = buildKeywordEditor();
+
   const body = document.createElement("div");
   body.className = "graph-modal-body";
 
@@ -83,6 +125,7 @@ function buildModal() {
   footer.appendChild(link);
 
   panel.appendChild(header);
+  panel.appendChild(keywordEditor.details);
   panel.appendChild(body);
   panel.appendChild(footer);
   backdrop.appendChild(panel);
@@ -95,7 +138,127 @@ function buildModal() {
     if (e.key === "Escape" && !backdrop.hidden) closeCommentGraph();
   });
 
-  return { backdrop, panel, title, status, chartWrap, canvas, link };
+  return { backdrop, panel, title, status, chartWrap, canvas, link, keywordEditor };
+}
+
+// ---- キーワード集計の編集パネル ----
+// <details> なので開閉自体はブラウザ標準の挙動 (キーボード操作も含め) に任せる。
+function buildKeywordEditor() {
+  const details = document.createElement("details");
+  details.className = "keyword-editor";
+
+  const summary = document.createElement("summary");
+  summary.className = "keyword-editor-summary";
+  details.appendChild(summary);
+
+  const bodyEl = document.createElement("div");
+  bodyEl.className = "keyword-editor-body";
+
+  const hint = document.createElement("p");
+  hint.className = "keyword-editor-hint";
+  hint.textContent =
+    "正規表現でキーワードを指定できます（例: 草|w、8{3,}、^あ+$）。1分ごとの出現回数を数え、" +
+    "全コメント数のグラフに重ねて表示します。";
+  bodyEl.appendChild(hint);
+
+  const list = document.createElement("div");
+  list.className = "keyword-editor-list";
+  bodyEl.appendChild(list);
+
+  const actions = document.createElement("div");
+  actions.className = "keyword-editor-actions";
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "keyword-add-btn";
+  addBtn.textContent = "＋ キーワードを追加";
+  const resetBtn = document.createElement("button");
+  resetBtn.type = "button";
+  resetBtn.className = "keyword-reset-btn";
+  resetBtn.textContent = "既定に戻す";
+  actions.appendChild(addBtn);
+  actions.appendChild(resetBtn);
+  bodyEl.appendChild(actions);
+
+  details.appendChild(bodyEl);
+
+  const editor = { details, summary, list };
+
+  addBtn.addEventListener("click", () => {
+    currentKeywords.push("");
+    onKeywordsChanged(editor);
+    const inputs = list.querySelectorAll(".keyword-editor-input");
+    const last = inputs[inputs.length - 1];
+    if (last) last.focus();
+  });
+  resetBtn.addEventListener("click", () => {
+    currentKeywords = [...DEFAULT_KEYWORDS];
+    onKeywordsChanged(editor);
+  });
+  // 開くたびに作り直す。モーダル自体は使い回すため、開いている間にライト/ダークを
+  // 切り替えても色のスウォッチ (chartPalette 由来) がその時点のテーマに追従するように。
+  details.addEventListener("toggle", () => {
+    if (details.open) renderKeywordRows(editor);
+  });
+
+  renderKeywordRows(editor);
+  return editor;
+}
+
+function updateKeywordSummary(editor) {
+  const active = currentKeywords.filter((w) => w.trim() !== "").length;
+  editor.summary.textContent = `🔧 キーワード集計 (${active})`;
+}
+
+function renderKeywordRows(editor) {
+  editor.list.textContent = "";
+  const palette = chartPalette();
+  currentKeywords.forEach((word, i) => {
+    const row = document.createElement("div");
+    row.className = "keyword-editor-row";
+
+    const swatch = document.createElement("span");
+    swatch.className = "keyword-color-swatch";
+    swatch.style.background = palette.keywordColors[i % palette.keywordColors.length];
+    row.appendChild(swatch);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = word;
+    input.placeholder = "正規表現 (例: 草|w)";
+    input.className = "keyword-editor-input";
+    input.setAttribute("aria-label", `キーワード ${i + 1}`);
+    if (word.trim() !== "" && !isValidRegex(word)) input.classList.add("invalid");
+    input.addEventListener("input", () => {
+      currentKeywords[i] = input.value;
+      input.classList.toggle("invalid", input.value.trim() !== "" && !isValidRegex(input.value));
+      saveKeywords(currentKeywords);
+      updateKeywordSummary(editor);
+      rerenderChart();
+    });
+    row.appendChild(input);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "keyword-remove-btn";
+    removeBtn.textContent = "✕";
+    removeBtn.setAttribute("aria-label", `キーワード ${i + 1} を削除`);
+    removeBtn.addEventListener("click", () => {
+      currentKeywords.splice(i, 1);
+      onKeywordsChanged(editor);
+    });
+    row.appendChild(removeBtn);
+
+    editor.list.appendChild(row);
+  });
+  updateKeywordSummary(editor);
+}
+
+// 行の増減 (追加/削除/リセット) は一覧を丸ごと作り直す。1文字ごとの入力(input)は
+// renderKeywordRows を呼ばない (フォーカスが飛ぶため、値の反映とサマリー更新だけ行う)。
+function onKeywordsChanged(editor) {
+  saveKeywords(currentKeywords);
+  renderKeywordRows(editor);
+  rerenderChart();
 }
 
 function closeCommentGraph() {
@@ -107,6 +270,10 @@ function closeCommentGraph() {
     } catch (e) {}
     currentChart = null;
   }
+  // キーワード編集中の再描画 (rerenderChart) が閉じたモーダルに対して走らないようにする
+  lastFiltered = null;
+  lastOffsetSec = null;
+  lastItem = null;
 }
 
 // ---- コメントの正規化（プラットフォーム差異を吸収） ----
@@ -156,25 +323,30 @@ function dedupComments(comments) {
 }
 
 // ---- 1分バケット集計 ----
-function bucketComments(filtered, lastOffset) {
+// keywords は文字列の配列を「そのまま」渡す (キーワード集計パネルの行と同じ並び・
+// 同じ色になるようにするため)。空文字列や無効な正規表現の行も、位置を保ったまま
+// 「常に0」のデータセットとして残す (削除しない限りグラフの色・凡例がズレないように)。
+// 同じキーワードが2件入力された場合の衝突を避けるため、辞書ではなく配列で持つ。
+function bucketComments(filtered, lastOffset, keywords) {
   const minutes = Math.max(1, Math.floor(lastOffset / 60) + 1);
   const totalCounts = new Array(minutes).fill(0);
-  const keywordCounts = {};
-  for (const word of GRAPH_KEYWORDS) keywordCounts[word] = new Array(minutes).fill(0);
+  const keywordCounts = keywords.map(() => new Array(minutes).fill(0));
 
   for (const c of filtered) {
     const diffMin = Math.floor(c.offsetSec / 60);
     if (diffMin < 0 || diffMin >= minutes) continue;
     totalCounts[diffMin]++;
     const text = c.text || "";
-    for (const word of GRAPH_KEYWORDS) {
+    keywords.forEach((word, i) => {
+      const pattern = (word || "").trim();
+      if (!pattern) return;
       try {
-        const matches = text.match(new RegExp(word, "gi"));
-        if (matches && matches.length < 10) keywordCounts[word][diffMin] += matches.length;
+        const matches = text.match(new RegExp(pattern, "gi"));
+        if (matches && matches.length < 10) keywordCounts[i][diffMin] += matches.length;
       } catch (e) {
-        /* 無効な正規表現は無視 */
+        /* 無効な正規表現は無視 (入力欄側は isValidRegex で赤枠にして知らせる) */
       }
-    }
+    });
   }
 
   const labels = totalCounts.map((_, i) => {
@@ -207,7 +379,7 @@ function setYoutubeSeekLink(link, item, seconds) {
   }
 }
 
-function renderChart(canvas, agg, item, link) {
+function renderChart(canvas, agg, item, link, keywords) {
   const ctx = canvas.getContext("2d");
   const palette = chartPalette();
   return new window.Chart(ctx, {
@@ -225,9 +397,9 @@ function renderChart(canvas, agg, item, link) {
           pointRadius: 0,
           yAxisID: "yTotal",
         },
-        ...GRAPH_KEYWORDS.map((word, i) => ({
-          label: word,
-          data: agg.keywordCounts[word],
+        ...keywords.map((word, i) => ({
+          label: word.trim() ? word : "(未入力)",
+          data: agg.keywordCounts[i],
           borderColor: palette.keywordColors[i % palette.keywordColors.length],
           borderWidth: 1.5,
           fill: false,
@@ -327,16 +499,37 @@ async function openCommentGraph(item) {
     }
     const filtered = dedupComments(comments);
     const lastOffset = comments[comments.length - 1].offsetSec;
-    const agg = bucketComments(filtered, lastOffset);
+
+    // キーワード編集パネルでの再集計 (rerenderChart) 用に保持しておく。
+    // 再フェッチせずに済むので、入力のたびにネットワークへ行かない。
+    lastFiltered = filtered;
+    lastOffsetSec = lastOffset;
+    lastItem = item;
 
     status.hidden = true;
     chartWrap.hidden = false;
-    currentChart = renderChart(canvas, agg, item, link);
+    currentChart = renderChart(canvas, bucketComments(filtered, lastOffset, currentKeywords), item, link, currentKeywords);
   } catch (e) {
     if (seq !== requestSeq) return;
     console.error("[CommentGraph]", e);
     status.textContent = "コメントデータの取得に失敗しました。";
   }
+}
+
+// キーワードの追加/削除/編集のたびに呼ばれる。開いているグラフがあれば
+// (フェッチし直さずに) その場で集計と描画をやり直す。
+function rerenderChart() {
+  if (!currentChart || !lastFiltered) return;
+  try {
+    currentChart.destroy();
+  } catch (e) {}
+  currentChart = renderChart(
+    modalEls.canvas,
+    bucketComments(lastFiltered, lastOffsetSec, currentKeywords),
+    lastItem,
+    modalEls.link,
+    currentKeywords
+  );
 }
 
 window.openCommentGraph = openCommentGraph;
