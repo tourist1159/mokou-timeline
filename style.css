@@ -163,7 +163,55 @@ body {
 }
 .search-group { flex: 1 1 200px; justify-content: flex-end; }
 
+/* ---- 並び順 ---- */
+.sort-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  /* ダーク時にネイティブのドロップダウンが白背景で出るのを防ぐ */
+  color-scheme: inherit;
+}
+.sort-select:focus { border-color: var(--accent); }
+
 /* ---- 期間フィルタ ---- */
+/* デスクトップは📅ボタン + ポップオーバー。ボタンの位置を基準に出す。 */
+.date-group-wrap { position: relative; }
+.date-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  font-family: inherit;
+  cursor: pointer;
+}
+.date-btn:hover { background: var(--surface-2); }
+/* 期間が効いているときは畳んでいても分かるようにする */
+.date-btn.has-filter { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.date-range {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.date-range.open { display: flex; }
 .date-input {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -773,11 +821,26 @@ body {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     z-index: 20;
   }
+  /* モバイルは絞り込みパネル自体が開閉式なので、📅ボタンで二重に畳まない。
+     ポップオーバーをやめて、パネルの中にそのまま並べる。 */
+  .date-btn { display: none; }
+  .date-group-wrap { width: 100%; position: static; }
+  .date-range {
+    display: flex;
+    position: static;
+    width: 100%;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
   /* パネルは縦並びなので、そのままだと日付入力が幅を取り切って1つずつ改行される。
      ラベルだけ1行使わせ、開始日〜終了日は横に並べて詰める。 */
-  .filter-groups.open .date-range { width: 100%; }
-  .filter-groups.open .date-range .control-label { flex: 0 0 100%; }
-  .filter-groups.open .date-input { flex: 1 1 0; min-width: 0; }
+  .date-range .control-label { flex: 0 0 100%; }
+  .date-input { flex: 1 1 0; min-width: 0; }
 }
 
 /* ---- 配信中のカード (タイムラインの中に他のカードと同じ形で並ぶ) ---- */

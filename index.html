@@ -28,7 +28,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=27" />
+  <link rel="stylesheet" href="style.css?v=28" />
 </head>
 <body>
   <header class="site-header">
@@ -61,19 +61,29 @@
         <!-- チャンネルのチップは app.js が動的に追加 -->
       </div>
 
-      <!-- 期間で絞り込む。日付は JST 基準で比較する (タイムライン側の日付グループと揃える) -->
-      <div class="control-group date-range">
-        <span class="control-label">期間</span>
-        <input type="date" id="filter-from" class="date-input" aria-label="開始日" />
-        <span class="date-sep">〜</span>
-        <input type="date" id="filter-to" class="date-input" aria-label="終了日" />
-        <button type="button" class="date-clear" id="date-clear" hidden>期間をクリア</button>
+      <!-- 期間で絞り込む。日付は JST 基準で比較する (タイムライン側の日付グループと揃える)。
+           デスクトップは📅ボタンで開閉するポップオーバー、モバイルは絞り込みパネルの中に
+           そのまま並べる (パネル自体が既に開閉式なので二重に畳まない)。 -->
+      <div class="control-group date-group-wrap">
+        <button class="date-btn" id="date-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="date-range" title="期間で絞り込む">📅</button>
+        <div class="date-range" id="date-range">
+          <span class="control-label">期間</span>
+          <input type="date" id="filter-from" class="date-input" aria-label="開始日" />
+          <span class="date-sep">〜</span>
+          <input type="date" id="filter-to" class="date-input" aria-label="終了日" />
+          <button type="button" class="date-clear" id="date-clear" hidden>期間をクリア</button>
+        </div>
       </div>
     </div>
 
     <div class="control-group">
       <span class="control-label">並び</span>
-      <button class="chip active" id="sort-toggle" data-order="desc">新しい順</button>
+      <select id="sort-select" class="sort-select" aria-label="並び順">
+        <option value="desc">新しい順</option>
+        <option value="asc">古い順</option>
+        <option value="views">再生数順</option>
+        <option value="comments">コメントの多い順</option>
+      </select>
     </div>
 
     <div class="control-group search-group">
@@ -130,7 +140,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=28"></script>
   <script src="commentgraph.js?v=9"></script>
 </body>
 </html>

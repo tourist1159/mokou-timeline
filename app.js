@@ -23,6 +23,9 @@ const CONFIG = {
 };
 
 /* ===== 状態 ===== */
+// 並び順の一覧 (index.html の <select id="sort-select"> と対応)。
+// desc/asc は日付順、views/comments は「多い順」。
+const SORT_ORDERS = ["desc", "asc", "views", "comments"];
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
 // view/timeline/newMarker/showComments/theme/onlyAvailable は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
@@ -341,8 +344,33 @@ function applyFilters() {
     if (q && !normalizeText(x.title).includes(q)) return false;
     return true;
   });
-  list.sort((a, b) => (state.order === "desc" ? b.start - a.start : a.start - b.start));
+  list.sort(sortComparator(state.order));
   return list;
+}
+
+// 並び順。日付順 (desc/asc) 以外は「数の多い順」で、値を持たないものは末尾へ送る
+// (再生数は YouTube のみ、コメント数は取得済みのものだけなので、0 扱いにすると
+// 「0回再生」と「未取得」が混ざってしまう)。同値・欠損同士は新しい順で安定させる。
+function sortComparator(order) {
+  if (order === "views" || order === "comments") {
+    const key = order === "views" ? "views" : "comments";
+    return (a, b) => {
+      const av = a[key];
+      const bv = b[key];
+      const aHas = typeof av === "number";
+      const bHas = typeof bv === "number";
+      if (aHas && bHas && av !== bv) return bv - av;
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      return b.start - a.start;
+    };
+  }
+  return (a, b) => (order === "asc" ? a.start - b.start : b.start - a.start);
+}
+
+// 日付でソートしているか。時間軸グループ (日付ごとの見出し) と新着境界線は
+// 「並びが日付順である」ことが前提なので、再生数順/コメント数順では使えない。
+function isDateOrder() {
+  return state.order === "desc" || state.order === "asc";
 }
 
 function makeThumb(item) {
@@ -529,6 +557,8 @@ function makeNewMarker() {
 // 端から連続していない場合や、全件新着/新着0件の場合は表示しない(-1)。
 function computeNewBoundary(list) {
   if (!state.newMarker || !list.length) return -1;
+  // 再生数順/コメント数順では新着が端に固まらないので境界線を出さない
+  if (!isDateOrder()) return -1;
   if (state.order === "desc") {
     let i = 0;
     while (i < list.length && list[i].isNew) i++;
@@ -594,15 +624,19 @@ function render() {
   const list = applyFilters();
   const grid = document.getElementById("grid");
   const empty = document.getElementById("empty");
+  // 時間軸グループは「並びが日付順」であることが前提 (連続した同じ日をまとめる作り)。
+  // 再生数順/コメント数順では日付が飛び飛びになり1件ずつの見出しが並んでしまうので、
+  // 設定がONでもフラット表示にする。
+  const withTimeline = state.timeline && isDateOrder();
   // with-timeline時は #grid 自身ではなく内側の .date-items が grid/list を担うので、
   // view-list クラスは timeline OFF の時だけ付ける (CSSの優先順位の衝突を避けるため)。
-  grid.classList.toggle("view-list", state.view === "list" && !state.timeline);
-  grid.classList.toggle("with-timeline", state.timeline);
+  grid.classList.toggle("view-list", state.view === "list" && !withTimeline);
+  grid.classList.toggle("with-timeline", withTimeline);
   grid.textContent = "";
 
   const boundary = computeNewBoundary(list);
   const frag = document.createDocumentFragment();
-  if (state.timeline) {
+  if (withTimeline) {
     renderWithTimeline(list, boundary, frag);
   } else {
     renderFlat(list, boundary, frag);
@@ -637,6 +671,8 @@ function readQuery() {
   for (const k of ["from", "to"]) {
     if (state[k] && !isValidDateKey(state[k])) state[k] = "";
   }
+  // 知らない並び順は既定に戻す (<select> に無い値だと表示と実際の並びが食い違うため)
+  if (!SORT_ORDERS.includes(state.order)) state.order = "desc";
 }
 
 // "YYYY-MM-DD" として妥当か。形だけの検査 (正規表現) では 2026-13-99 や 2026-02-31 を
@@ -666,15 +702,14 @@ function syncChipUI() {
       chip.classList.toggle("active", chip.dataset.value === state[key]);
     });
   });
-  const st = document.getElementById("sort-toggle");
-  st.dataset.order = state.order;
-  st.textContent = state.order === "desc" ? "新しい順" : "古い順";
-  st.classList.add("active");
+  document.getElementById("sort-select").value = state.order;
   document.getElementById("search").value = state.q;
   document.getElementById("filter-from").value = state.from;
   document.getElementById("filter-to").value = state.to;
   // クリアボタンは期間が指定されているときだけ出す (未指定時は場所を取るだけなので)
   document.getElementById("date-clear").hidden = !state.from && !state.to;
+  // 📅ボタンは畳まれていると期間指定中かどうか分からないので、効いていたら見た目を変える
+  document.getElementById("date-toggle").classList.toggle("has-filter", !!(state.from || state.to));
   syncFilterButton();
 }
 
@@ -711,10 +746,9 @@ function wireEvents() {
     });
   });
 
-  const st = document.getElementById("sort-toggle");
-  st.addEventListener("click", () => {
-    state.order = state.order === "desc" ? "asc" : "desc";
-    syncChipUI();
+  const sortSelect = document.getElementById("sort-select");
+  sortSelect.addEventListener("change", () => {
+    state.order = sortSelect.value;
     writeQuery();
     render();
   });
@@ -822,6 +856,26 @@ function wireFilterPanel() {
   });
 }
 
+/* ===== 期間フィルタの開閉 (デスクトップのみ。モバイルは絞り込みパネル内に常時表示) ===== */
+function wireDatePanel() {
+  const btn = document.getElementById("date-toggle");
+  const panel = document.getElementById("date-range");
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = !panel.classList.contains("open");
+    panel.classList.toggle("open", willOpen);
+    btn.setAttribute("aria-expanded", String(willOpen));
+  });
+  // 日付を選ぶ操作で閉じない (開始日→終了日と続けて指定できるように)
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => {
+    if (panel.classList.contains("open")) {
+      panel.classList.remove("open");
+      btn.setAttribute("aria-expanded", "false");
+    }
+  });
+}
+
 /* ===== 起動 ===== */
 async function main() {
   // 表示設定(テーマ含む)はデータ取得を待たず先に読み込む。テーマ自体は index.html
@@ -851,6 +905,7 @@ async function main() {
   wireEvents();
   wireSettingsPanel();
   wireFilterPanel();
+  wireDatePanel();
   render();
 
   if (failed.length) {
