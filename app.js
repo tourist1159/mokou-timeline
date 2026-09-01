@@ -28,6 +28,8 @@ let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
 // view/timeline/newMarker/showComments/theme/onlyAvailable は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
 const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
+  // 期間フィルタ ("YYYY-MM-DD" / 未指定は空文字)。JST基準の日付キーと文字列比較する。
+  from: "", to: "",
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
   onlyAvailable: false,
 };
@@ -327,6 +329,14 @@ function applyFilters() {
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
+    // 期間は JST の日付キー ("YYYY-MM-DD") 同士の文字列比較で判定する。ゼロ埋め固定長
+    // なので辞書順＝日付順になり、タイムゾーン計算をせずに端の日を「その日いっぱい」
+    // 含められる (タイムライン側の日付グループとも同じ基準になる)。
+    if (state.from || state.to) {
+      const key = jstDateKey(x.start);
+      if (state.from && key < state.from) return false;
+      if (state.to && key > state.to) return false;
+    }
     if (state.onlyAvailable && !x.available) return false;
     if (q && !normalizeText(x.title).includes(q)) return false;
     return true;
@@ -620,15 +630,30 @@ function buildChannelChips() {
 /* ===== URL クエリ同期 ===== */
 function readQuery() {
   const p = new URLSearchParams(location.search);
-  for (const k of ["platform", "channel", "type", "order", "q"]) {
+  for (const k of ["platform", "channel", "type", "order", "q", "from", "to"]) {
     if (p.has(k)) state[k] = p.get(k);
   }
+  // 壊れた値 (手で編集された共有URL等) はフィルタを効かせず素通りさせる
+  for (const k of ["from", "to"]) {
+    if (state[k] && !isValidDateKey(state[k])) state[k] = "";
+  }
+}
+
+// "YYYY-MM-DD" として妥当か。形だけの検査 (正規表現) では 2026-13-99 や 2026-02-31 を
+// 通してしまい、入力欄は空なのに state には値が残る、という食い違いが起きるため、
+// 実在する日付かどうかまで確認する。
+function isValidDateKey(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !isNaN(d) && d.toISOString().slice(0, 10) === s;
 }
 function writeQuery() {
   const p = new URLSearchParams();
   for (const k of ["platform", "channel", "type"]) if (state[k] !== "all") p.set(k, state[k]);
   if (state.order !== "desc") p.set("order", state.order);
   if (state.q) p.set("q", state.q);
+  if (state.from) p.set("from", state.from);
+  if (state.to) p.set("to", state.to);
   const qs = p.toString();
   history.replaceState(null, "", qs ? "?" + qs : location.pathname);
 }
@@ -646,6 +671,10 @@ function syncChipUI() {
   st.textContent = state.order === "desc" ? "新しい順" : "古い順";
   st.classList.add("active");
   document.getElementById("search").value = state.q;
+  document.getElementById("filter-from").value = state.from;
+  document.getElementById("filter-to").value = state.to;
+  // クリアボタンは期間が指定されているときだけ出す (未指定時は場所を取るだけなので)
+  document.getElementById("date-clear").hidden = !state.from && !state.to;
   syncFilterButton();
 }
 
@@ -653,7 +682,8 @@ function syncChipUI() {
 function syncFilterButton() {
   const btn = document.getElementById("filter-toggle");
   if (!btn) return;
-  const active = ["platform", "type", "channel"].filter((k) => state[k] !== "all").length;
+  let active = ["platform", "type", "channel"].filter((k) => state[k] !== "all").length;
+  if (state.from || state.to) active++; // 期間は from/to 合わせて1件と数える
   btn.textContent = active ? `絞り込み (${active})` : "絞り込み";
   btn.classList.toggle("has-filter", active > 0);
 }
@@ -692,6 +722,32 @@ function wireEvents() {
   const search = document.getElementById("search");
   search.addEventListener("input", () => {
     state.q = search.value;
+    writeQuery();
+    render();
+  });
+
+  // 期間フィルタ。type="date" は日付が揃った時点で change が飛ぶので、
+  // 入力途中(年だけ入れた状態など)で一覧が空になることはない。
+  const fromInput = document.getElementById("filter-from");
+  const toInput = document.getElementById("filter-to");
+  const onDateChange = () => {
+    state.from = fromInput.value;
+    state.to = toInput.value;
+    // 逆順に指定されたときは入れ替える (「2026/08/31〜2026/08/01」で0件になるより、
+    // 意図どおりの期間を出す方が親切)
+    if (state.from && state.to && state.from > state.to) {
+      [state.from, state.to] = [state.to, state.from];
+    }
+    syncChipUI();
+    writeQuery();
+    render();
+  };
+  fromInput.addEventListener("change", onDateChange);
+  toInput.addEventListener("change", onDateChange);
+  document.getElementById("date-clear").addEventListener("click", () => {
+    state.from = "";
+    state.to = "";
+    syncChipUI();
     writeQuery();
     render();
   });

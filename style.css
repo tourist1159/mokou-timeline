@@ -163,6 +163,35 @@ body {
 }
 .search-group { flex: 1 1 200px; justify-content: flex-end; }
 
+/* ---- 期間フィルタ ---- */
+.date-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  outline: none;
+  /* ライト/ダークどちらでもカレンダーアイコンが見えるようにする
+     (color-scheme を渡さないと、ダーク時にネイティブUIが白背景で出る) */
+  color-scheme: inherit;
+}
+.date-input:focus { border-color: var(--accent); }
+.date-sep { color: var(--text-dim); font-size: 0.8rem; }
+.date-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.date-clear:hover { background: var(--surface-2); color: var(--text); }
+
 /* ---- 絞り込み(配信元・種別・チャンネル) ---- */
 /* デスクトップでは開閉ボタンを出さず、3つの control-group が今までどおり
    .controls の flex 並びに直接乗る (display:contents)。 */
@@ -744,6 +773,11 @@ body {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     z-index: 20;
   }
+  /* パネルは縦並びなので、そのままだと日付入力が幅を取り切って1つずつ改行される。
+     ラベルだけ1行使わせ、開始日〜終了日は横に並べて詰める。 */
+  .filter-groups.open .date-range { width: 100%; }
+  .filter-groups.open .date-range .control-label { flex: 0 0 100%; }
+  .filter-groups.open .date-input { flex: 1 1 0; min-width: 0; }
 }
 
 /* ---- 配信中のカード (タイムラインの中に他のカードと同じ形で並ぶ) ---- */

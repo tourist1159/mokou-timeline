@@ -28,7 +28,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=25" />
+  <link rel="stylesheet" href="style.css?v=27" />
 </head>
 <body>
   <header class="site-header">
@@ -59,6 +59,15 @@
         <span class="control-label">チャンネル</span>
         <button class="chip active" data-value="all">すべて</button>
         <!-- チャンネルのチップは app.js が動的に追加 -->
+      </div>
+
+      <!-- 期間で絞り込む。日付は JST 基準で比較する (タイムライン側の日付グループと揃える) -->
+      <div class="control-group date-range">
+        <span class="control-label">期間</span>
+        <input type="date" id="filter-from" class="date-input" aria-label="開始日" />
+        <span class="date-sep">〜</span>
+        <input type="date" id="filter-to" class="date-input" aria-label="終了日" />
+        <button type="button" class="date-clear" id="date-clear" hidden>期間をクリア</button>
       </div>
     </div>
 
@@ -121,7 +130,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=24"></script>
+  <script src="app.js?v=26"></script>
   <script src="commentgraph.js?v=9"></script>
 </body>
 </html>
