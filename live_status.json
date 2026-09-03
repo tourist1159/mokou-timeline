@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-09-03T10:04:59.178933+00:00",
-  "live": []
+  "checked_at": "2026-09-03T11:04:57.267446+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokoustream",
+      "title": "【緊急】マリオカートワールドでコラボ！　不破湊、P-P、GON、葉、馬場",
+      "url": "https://www.youtube.com/watch?v=BCApB4n3SFY",
+      "videoId": "BCApB4n3SFY",
+      "thumbnail": "https://i.ytimg.com/vi/BCApB4n3SFY/mqdefault.jpg"
+    }
+  ]
 }
