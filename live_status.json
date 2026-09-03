@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-09-03T04:47:25.055751+00:00",
-  "live": []
+  "checked_at": "2026-09-03T09:35:45.512104+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "謎のコラボをする件",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/pX5vjmjo7dGX/720.webp?versionId=t4Q2VqHs6CKgvYNuw4xJuMdnRDbjHZ2T",
+      "viewers": null
+    }
+  ]
 }
