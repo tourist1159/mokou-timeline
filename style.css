@@ -246,6 +246,11 @@ body {
 .filter-btn { display: none; }
 .filter-groups { display: contents; }
 
+/* モバイルで「並び+検索」「表示設定+絞り込み」をそれぞれ1行にまとめるための箱。
+   デスクトップでは display:contents にして、中身が .controls の flex 並びに
+   直接乗る (箱が無かったときと見た目が変わらないようにする)。 */
+.control-row { display: contents; }
+
 /* ---- 表示設定パネル ---- */
 .settings-group { position: relative; }
 .settings-btn {
@@ -779,6 +784,28 @@ body {
     gap: 8px 12px;
     background: none;
     backdrop-filter: none;
+  }
+
+  /* 「並び+検索」「表示設定+絞り込み」を、それぞれ横幅いっぱいの1行にする。
+     .controls 自体は flex-wrap なので、width:100% の行が来るたびに次の要素は
+     自動的に改行される (float のクリアと同じ理屈)。 */
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  /* 並びのラベルは省略し、検索バーとの2要素だけの行にする (select 自体に
+     aria-label="並び順" があるのでアクセシビリティ上の名前は失われない)。
+     select は内容ぶんの幅のまま伸縮させず、余った幅は検索バー側に回す。 */
+  #sort-group .control-label { display: none; }
+  #sort-group { flex: 0 0 auto; }
+  .search-group {
+    flex: 1 1 auto;
+    /* flex item の初期値 min-width:auto は「中身の最小幅」まで縮まなくする性質があり、
+       検索バーがそれ単独の行を占めていた元のレイアウトでは問題にならなかった。
+       並びのselectと同じ行に並べる以上、幅が足りないときはこちらが縮む必要がある。 */
+    min-width: 0;
   }
 
   /* 絞り込みは畳んでボタンだけ出す。ボタンは表示設定と同じ行の右端 (margin-left:auto)。

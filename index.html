@@ -28,7 +28,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=28" />
+  <link rel="stylesheet" href="style.css?v=29" />
 </head>
 <body>
   <header class="site-header">
@@ -76,59 +76,66 @@
       </div>
     </div>
 
-    <div class="control-group">
-      <span class="control-label">並び</span>
-      <select id="sort-select" class="sort-select" aria-label="並び順">
-        <option value="desc">新しい順</option>
-        <option value="asc">古い順</option>
-        <option value="views">再生数順</option>
-        <option value="comments">コメントの多い順</option>
-      </select>
-    </div>
+    <!-- モバイルでは「並び」と検索バーを1行に、「表示設定」と「絞り込み」を1行にまとめる。
+         デスクトップでは display:contents にして、今までどおり1つの並びに乗せる
+         (見た目は変えず、要素をまとめるためだけの箱)。 -->
+    <div class="control-row">
+      <div class="control-group" id="sort-group">
+        <span class="control-label">並び</span>
+        <select id="sort-select" class="sort-select" aria-label="並び順">
+          <option value="desc">新しい順</option>
+          <option value="asc">古い順</option>
+          <option value="views">再生数順</option>
+          <option value="comments">コメントの多い順</option>
+        </select>
+      </div>
 
-    <div class="control-group search-group">
-      <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
-    </div>
-
-    <div class="control-group settings-group">
-      <button class="settings-btn" id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">⚙️ 表示設定</button>
-      <div class="settings-panel" id="settings-panel" hidden>
-        <div class="settings-row">
-          <span class="control-label">カラーテーマ</span>
-          <div class="control-group" id="theme-toggle" data-key="theme">
-            <button class="chip active" data-value="system">端末に合わせる</button>
-            <button class="chip" data-value="light">ライト</button>
-            <button class="chip" data-value="dark">ダーク</button>
-          </div>
-        </div>
-        <div class="settings-row">
-          <span class="control-label">表示形式</span>
-          <div class="control-group" id="view-toggle" data-key="view">
-            <button class="chip active" data-value="grid">グリッド</button>
-            <button class="chip" data-value="list">リスト</button>
-          </div>
-        </div>
-        <label class="settings-toggle">
-          <span>左に時間軸を表示</span>
-          <input type="checkbox" id="toggle-timeline" />
-        </label>
-        <label class="settings-toggle">
-          <span>新着の境界線を表示</span>
-          <input type="checkbox" id="toggle-newmarker" />
-        </label>
-        <label class="settings-toggle">
-          <span>コメント数・グラフボタンを表示</span>
-          <input type="checkbox" id="toggle-comments" />
-        </label>
-        <label class="settings-toggle">
-          <span>視聴可能なアーカイブのみ表示</span>
-          <input type="checkbox" id="toggle-available" />
-        </label>
+      <div class="control-group search-group">
+        <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
       </div>
     </div>
 
-    <!-- モバイル専用。表示設定と同じ行の右端に置く (デスクトップでは非表示) -->
-    <button class="filter-btn" id="filter-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="filter-groups">絞り込み</button>
+    <div class="control-row">
+      <div class="control-group settings-group">
+        <button class="settings-btn" id="settings-btn" type="button" aria-haspopup="true" aria-expanded="false">⚙️ 表示設定</button>
+        <div class="settings-panel" id="settings-panel" hidden>
+          <div class="settings-row">
+            <span class="control-label">カラーテーマ</span>
+            <div class="control-group" id="theme-toggle" data-key="theme">
+              <button class="chip active" data-value="system">端末に合わせる</button>
+              <button class="chip" data-value="light">ライト</button>
+              <button class="chip" data-value="dark">ダーク</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span class="control-label">表示形式</span>
+            <div class="control-group" id="view-toggle" data-key="view">
+              <button class="chip active" data-value="grid">グリッド</button>
+              <button class="chip" data-value="list">リスト</button>
+            </div>
+          </div>
+          <label class="settings-toggle">
+            <span>左に時間軸を表示</span>
+            <input type="checkbox" id="toggle-timeline" />
+          </label>
+          <label class="settings-toggle">
+            <span>新着の境界線を表示</span>
+            <input type="checkbox" id="toggle-newmarker" />
+          </label>
+          <label class="settings-toggle">
+            <span>コメント数・グラフボタンを表示</span>
+            <input type="checkbox" id="toggle-comments" />
+          </label>
+          <label class="settings-toggle">
+            <span>視聴可能なアーカイブのみ表示</span>
+            <input type="checkbox" id="toggle-available" />
+          </label>
+        </div>
+      </div>
+
+      <!-- モバイル専用。表示設定と同じ行に置く (デスクトップでは非表示) -->
+      <button class="filter-btn" id="filter-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="filter-groups">絞り込み</button>
+    </div>
   </div>
 
   <main id="grid" class="grid" aria-live="polite"></main>
