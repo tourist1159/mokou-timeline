@@ -599,7 +599,22 @@ body {
 .card.unavailable:hover { transform: none; border-color: var(--border); }
 .card.unavailable .thumb { filter: grayscale(1); }
 .card-date { width: 100%; }
+/* コメント数。<button> だがメタ行に馴染ませたいので、見た目は素のテキストに寄せる
+   (クリックで「総数 ⇄ 1時間あたり」の切り替え)。 */
+.comments {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+.comments:hover { text-decoration: underline; }
 .comments::before { content: "💬 "; }
+/* 1時間あたり表示のときは、総数と見間違えないよう記号を変える */
+.comments.rate::before { content: "⚡ "; }
 /* 再生数 (YouTubeのみ。12時間ごとに更新される概数) */
 .views::before { content: "▶️ "; }
 

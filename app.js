@@ -24,8 +24,8 @@ const CONFIG = {
 
 /* ===== 状態 ===== */
 // 並び順の一覧 (index.html の <select id="sort-select"> と対応)。
-// desc/asc は日付順、views/comments は「多い順」。
-const SORT_ORDERS = ["desc", "asc", "views", "comments"];
+// desc/asc は日付順、views/comments/rate は「多い順・速い順」。
+const SORT_ORDERS = ["desc", "asc", "views", "comments", "rate"];
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
 // view/timeline/newMarker/showComments/theme/onlyAvailable は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
@@ -37,13 +37,15 @@ const state = {
   tag: "",
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
   onlyAvailable: false,
+  // カードのコメント欄の表示 "total"=総数 / "rate"=1時間あたり。クリックで切り替える。
+  commentMode: "total",
 };
 
 /* ===== 表示設定 (localStorage) ===== */
 const SETTINGS_KEY = "mokou-timeline:settings";
 const DEFAULT_SETTINGS = {
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
-  onlyAvailable: false,
+  onlyAvailable: false, commentMode: "total",
 };
 
 function loadSettings() {
@@ -66,6 +68,7 @@ function saveSettings() {
         showComments: state.showComments,
         theme: state.theme,
         onlyAvailable: state.onlyAvailable,
+        commentMode: state.commentMode,
       })
     );
   } catch (e) {
@@ -175,13 +178,24 @@ function fmtDuration(sec, lengthStr) {
   const p = (n) => String(n).padStart(2, "0");
   return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
 }
-// 再生数は概数で出す (12時間ごとの更新なので下の桁に意味が無い)。
+// 再生数・コメント数のような「件数」は概数で出す (桁が大きく、下の桁に意味が無いため)。
 // YouTube の日本語表記に合わせて 1万以上は「◯.◯万」、それ未満はカンマ区切り。
-function fmtViews(n) {
+function fmtCount(n) {
   if (typeof n !== "number" || !isFinite(n)) return "";
   if (n >= 100000000) return `${(n / 100000000).toFixed(1).replace(/\.0$/, "")}億`;
   if (n >= 10000) return `${(n / 10000).toFixed(1).replace(/\.0$/, "")}万`;
   return n.toLocaleString();
+}
+
+// コメントの流れの速さ = 1時間あたりのコメント数。長さが分からないものは出せないので null。
+// (ライブ中のカードは durationSec=0、Twitch はコメント自体を持たない)
+function commentRate(item) {
+  if (typeof item.comments !== "number") return null;
+  if (!(item.durationSec > 0)) return null;
+  return item.comments / (item.durationSec / 3600);
+}
+function fmtRate(n) {
+  return `${fmtCount(Math.round(n))}/時`;
 }
 function normalizeText(t) {
   return (t || "").toLowerCase().replace(/[！!？?\s]/g, "").normalize("NFKC");
@@ -401,11 +415,13 @@ function applyFilters() {
 // (再生数は YouTube のみ、コメント数は取得済みのものだけなので、0 扱いにすると
 // 「0回再生」と「未取得」が混ざってしまう)。同値・欠損同士は新しい順で安定させる。
 function sortComparator(order) {
-  if (order === "views" || order === "comments") {
-    const key = order === "views" ? "views" : "comments";
+  if (order === "views" || order === "comments" || order === "rate") {
+    // rate は保存された値ではなくその場で計算する (コメント数 ÷ 長さ)
+    const valueOf =
+      order === "rate" ? commentRate : (x) => x[order === "views" ? "views" : "comments"];
     return (a, b) => {
-      const av = a[key];
-      const bv = b[key];
+      const av = valueOf(a);
+      const bv = valueOf(b);
       const aHas = typeof av === "number";
       const bHas = typeof bv === "number";
       if (aHas && bHas && av !== bv) return bv - av;
@@ -417,7 +433,7 @@ function sortComparator(order) {
 }
 
 // 日付でソートしているか。時間軸グループ (日付ごとの見出し) と新着境界線は
-// 「並びが日付順である」ことが前提なので、再生数順/コメント数順では使えない。
+// 「並びが日付順である」ことが前提なので、再生数順/コメント数順/速い順では使えない。
 function isDateOrder() {
   return state.order === "desc" || state.order === "asc";
 }
@@ -527,15 +543,31 @@ function makeCard(item) {
   if (item.views != null) {
     const v = document.createElement("span");
     v.className = "views";
-    v.textContent = fmtViews(item.views);
+    v.textContent = fmtCount(item.views);
     v.title = `${item.views.toLocaleString()}回視聴`;
     meta.appendChild(v);
   }
 
+  // コメント数。クリックで「総数 ⇄ 1時間あたり(流れの速さ)」を全カードまとめて切り替える。
+  // カード自体が <a> なので、押しても動画へ飛ばないよう preventDefault する
+  // (グラフボタンと同じ作り)。
   if (state.showComments && item.comments != null) {
-    const c = document.createElement("span");
-    c.className = "comments";
-    c.textContent = item.comments.toLocaleString();
+    const rate = commentRate(item);
+    const showRate = state.commentMode === "rate" && rate != null;
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = showRate ? "comments rate" : "comments";
+    c.textContent = showRate ? fmtRate(rate) : fmtCount(item.comments);
+    c.title = showRate
+      ? `1時間あたり約${Math.round(rate).toLocaleString()}コメント（全${item.comments.toLocaleString()}件 / ${fmtDuration(item.durationSec, item.lengthStr)}）`
+      : `${item.comments.toLocaleString()}件のコメント${rate != null ? "（クリックで1時間あたりの速さ）" : ""}`;
+    c.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      state.commentMode = state.commentMode === "rate" ? "total" : "rate";
+      saveSettings();
+      render();
+    });
     meta.appendChild(c);
   }
 
@@ -829,6 +861,12 @@ function wireEvents() {
   const sortSelect = document.getElementById("sort-select");
   sortSelect.addEventListener("change", () => {
     state.order = sortSelect.value;
+    // 速い順に並べたのにカードが総数のままだと並びの理由が見えないので、表示も速さに寄せる
+    // (押し付けではなく初期値の変更。コメント数をクリックすれば総数に戻せる)。
+    if (state.order === "rate") {
+      state.commentMode = "rate";
+      saveSettings();
+    }
     writeQuery();
     render();
   });
