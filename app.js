@@ -33,6 +33,8 @@ const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
   // 期間フィルタ ("YYYY-MM-DD" / 未指定は空文字)。JST基準の日付キーと文字列比較する。
   from: "", to: "",
+  // タグでの絞り込み (候補から選んだタグ名そのまま / 未指定は空文字)
+  tag: "",
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
   onlyAvailable: false,
 };
@@ -209,6 +211,9 @@ function normalizeYouTube(arr) {
     views: typeof v.view_count === "number" ? v.view_count : null,
     // メンバー限定配信 (YouTube は再生数も公開していないので views は null になる)
     membersOnly: v.members_only === true,
+    // 動画のタグ(キーワード)。YouTube のみで、fetcher が12時間ごとに取り直す。
+    // Kick/Twitch には無いので、参照側は x.tags || [] で守る。
+    tags: Array.isArray(v.tags) ? v.tags : [],
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
     available: v.available !== false, // フラグ未設定は視聴可能とみなす
     commentsKey: v.video_id, // comments_github/<commentsKey>_comments.json
@@ -316,8 +321,51 @@ function liveItems() {
   }));
 }
 
+/* ===== タグ索引 (検索候補の語彙) ===== */
+// [{ label, norm, count }] を件数の多い順で持つ。表示用のラベルは最初に見つけた表記を使う。
+let TAG_INDEX = [];
+
+function buildTagIndex() {
+  const map = new Map(); // 正規化後のタグ -> { label, norm, count }
+  for (const item of ALL) {
+    // 同じ動画に同じタグが重複していても1件と数える
+    const seen = new Set();
+    for (const raw of item.tags || []) {
+      const norm = normalizeText(raw);
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
+      const cur = map.get(norm);
+      if (cur) cur.count++;
+      else map.set(norm, { label: raw, norm, count: 1 });
+    }
+  }
+  TAG_INDEX = [...map.values()].sort(
+    (a, b) => b.count - a.count || a.label.localeCompare(b.label, "ja")
+  );
+}
+
+// 入力文字列を含むタグの候補。前方一致を優先し、次に件数の多い順。
+function suggestTags(qNorm, limit = 10) {
+  if (!qNorm) return [];
+  return TAG_INDEX.filter((t) => t.norm.includes(qNorm))
+    .sort((a, b) => {
+      const ap = a.norm.startsWith(qNorm) ? 0 : 1;
+      const bp = b.norm.startsWith(qNorm) ? 0 : 1;
+      return ap - bp || b.count - a.count || a.label.localeCompare(b.label, "ja");
+    })
+    .slice(0, limit);
+}
+
+// 自由入力の検索はタイトルとタグの両方に当てる (タイトルに無い語でもタグ経由で拾えるように)。
+function matchesQuery(item, q) {
+  if (normalizeText(item.title).includes(q)) return true;
+  return (item.tags || []).some((t) => normalizeText(t).includes(q));
+}
+
 function applyFilters() {
   const q = normalizeText(state.q);
+  // タグは候補から選んだ1つに厳密一致で絞る (自由入力の部分一致とは別扱い)
+  const tagNorm = normalizeText(state.tag);
   const live = liveItems();
   // 同じ配信がアーカイブ側にも載っていることがある。Kick は配信中からVODが作られるため
   // 常に、YouTube は配信終了直後(収集がライブ判定より早いとき)に起きる。ライブ側を優先する。
@@ -332,6 +380,7 @@ function applyFilters() {
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
+    if (tagNorm && !(x.tags || []).some((t) => normalizeText(t) === tagNorm)) return false;
     // 期間は JST の日付キー ("YYYY-MM-DD") 同士の文字列比較で判定する。ゼロ埋め固定長
     // なので辞書順＝日付順になり、タイムゾーン計算をせずに端の日を「その日いっぱい」
     // 含められる (タイムライン側の日付グループとも同じ基準になる)。
@@ -341,7 +390,7 @@ function applyFilters() {
       if (state.to && key > state.to) return false;
     }
     if (state.onlyAvailable && !x.available) return false;
-    if (q && !normalizeText(x.title).includes(q)) return false;
+    if (q && !matchesQuery(x, q)) return false;
     return true;
   });
   list.sort(sortComparator(state.order));
@@ -664,7 +713,7 @@ function buildChannelChips() {
 /* ===== URL クエリ同期 ===== */
 function readQuery() {
   const p = new URLSearchParams(location.search);
-  for (const k of ["platform", "channel", "type", "order", "q", "from", "to"]) {
+  for (const k of ["platform", "channel", "type", "order", "q", "from", "to", "tag"]) {
     if (p.has(k)) state[k] = p.get(k);
   }
   // 壊れた値 (手で編集された共有URL等) はフィルタを効かせず素通りさせる
@@ -690,6 +739,7 @@ function writeQuery() {
   if (state.q) p.set("q", state.q);
   if (state.from) p.set("from", state.from);
   if (state.to) p.set("to", state.to);
+  if (state.tag) p.set("tag", state.tag);
   const qs = p.toString();
   history.replaceState(null, "", qs ? "?" + qs : location.pathname);
 }
@@ -710,7 +760,37 @@ function syncChipUI() {
   document.getElementById("date-clear").hidden = !state.from && !state.to;
   // 📅ボタンは畳まれていると期間指定中かどうか分からないので、効いていたら見た目を変える
   document.getElementById("date-toggle").classList.toggle("has-filter", !!(state.from || state.to));
+  renderActiveTag();
   syncFilterButton();
+}
+
+// タグで絞り込み中だけ「🏷 タグ名 ✕」のチップを出す。
+// ✕ の解除は #active-tag への委譲リスナー (wireEvents) が拾うので、ここでは作るだけ。
+function renderActiveTag() {
+  const box = document.getElementById("active-tag");
+  box.textContent = "";
+  if (!state.tag) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+
+  const chip = document.createElement("span");
+  chip.className = "active-tag-chip";
+
+  const label = document.createElement("span");
+  label.className = "active-tag-label";
+  label.textContent = `🏷 ${state.tag}`; // textContent で XSS 回避
+  chip.appendChild(label);
+
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "active-tag-clear";
+  clear.textContent = "✕";
+  clear.setAttribute("aria-label", `タグ「${state.tag}」の絞り込みを解除`);
+  chip.appendChild(clear);
+
+  box.appendChild(chip);
 }
 
 // モバイルでは絞り込みチップが畳まれていて見えないので、いくつ効いているかをボタンに出す。
@@ -756,6 +836,16 @@ function wireEvents() {
   const search = document.getElementById("search");
   search.addEventListener("input", () => {
     state.q = search.value;
+    writeQuery();
+    render();
+    refreshTagSuggest(); // 入力のたびにタグ候補も出し直す
+  });
+
+  // タグの絞り込み解除 (チップは syncChipUI が毎回作り直すので委譲で拾う)
+  document.getElementById("active-tag").addEventListener("click", (e) => {
+    if (!e.target.closest(".active-tag-clear")) return;
+    state.tag = "";
+    syncChipUI();
     writeQuery();
     render();
   });
@@ -856,6 +946,121 @@ function wireFilterPanel() {
   });
 }
 
+/* ===== タグ候補のサジェスト ===== */
+// 検索ボックスに文字を入れると、その文字列を含むタグを件数付きで出す。
+// 「もこう(53)」のようにほぼ全動画に付くタグもあるため、件数を併記して
+// 絞り込みに使えるタグかどうかをユーザーが判断できるようにしている。
+let suggestItems = []; // 現在表示中の候補 [{ label, norm, count }]
+let suggestActive = -1; // キーボードで選択中の位置 (-1 は未選択)
+
+function suggestEls() {
+  return {
+    input: document.getElementById("search"),
+    panel: document.getElementById("tag-suggest"),
+  };
+}
+
+function closeTagSuggest() {
+  const { input, panel } = suggestEls();
+  panel.classList.remove("open");
+  panel.textContent = "";
+  input.setAttribute("aria-expanded", "false");
+  suggestItems = [];
+  suggestActive = -1;
+}
+
+function refreshTagSuggest() {
+  const { input, panel } = suggestEls();
+  suggestItems = suggestTags(normalizeText(input.value));
+  suggestActive = -1;
+  panel.textContent = "";
+
+  if (!suggestItems.length) {
+    closeTagSuggest();
+    return;
+  }
+
+  for (const [i, t] of suggestItems.entries()) {
+    const row = document.createElement("div");
+    row.className = "tag-suggest-item";
+    row.setAttribute("role", "option");
+    row.dataset.index = String(i);
+
+    const label = document.createElement("span");
+    label.className = "tag-suggest-label";
+    label.textContent = t.label; // textContent で XSS 回避
+    row.appendChild(label);
+
+    const count = document.createElement("span");
+    count.className = "tag-suggest-count";
+    count.textContent = t.count;
+    row.appendChild(count);
+
+    panel.appendChild(row);
+  }
+  panel.classList.add("open");
+  input.setAttribute("aria-expanded", "true");
+}
+
+function highlightSuggest(next) {
+  const { panel } = suggestEls();
+  const rows = panel.querySelectorAll(".tag-suggest-item");
+  if (!rows.length) return;
+  suggestActive = (next + rows.length) % rows.length;
+  rows.forEach((r, i) => r.classList.toggle("active", i === suggestActive));
+  rows[suggestActive].scrollIntoView({ block: "nearest" });
+}
+
+function selectTag(label) {
+  state.tag = label;
+  state.q = ""; // タグで絞ったらフリーワードは持ち越さない (二重に絞られると分かりにくい)
+  closeTagSuggest();
+  syncChipUI();
+  writeQuery();
+  render();
+}
+
+function wireTagSuggest() {
+  const { input, panel } = suggestEls();
+
+  input.addEventListener("keydown", (e) => {
+    if (!panel.classList.contains("open")) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      highlightSuggest(suggestActive + 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      highlightSuggest(suggestActive - 1);
+    } else if (e.key === "Enter") {
+      if (suggestActive >= 0 && suggestItems[suggestActive]) {
+        e.preventDefault();
+        selectTag(suggestItems[suggestActive].label);
+      }
+    } else if (e.key === "Escape") {
+      closeTagSuggest();
+    }
+  });
+
+  // click ではなく mousedown で拾う。click だと入力欄の blur が先に走り、
+  // 候補が閉じた後のクリックになって選択できないことがある。
+  panel.addEventListener("mousedown", (e) => {
+    const row = e.target.closest(".tag-suggest-item");
+    if (!row) return;
+    e.preventDefault(); // 入力欄からフォーカスを外さない
+    const item = suggestItems[Number(row.dataset.index)];
+    if (item) selectTag(item.label);
+  });
+
+  input.addEventListener("focus", () => {
+    if (input.value) refreshTagSuggest();
+  });
+  // 外側クリックで閉じる (他のパネルと同じ流儀。パネル内の mousedown は上で止めている)
+  document.addEventListener("click", (e) => {
+    if (e.target === input) return;
+    if (panel.classList.contains("open")) closeTagSuggest();
+  });
+}
+
 /* ===== 期間フィルタの開閉 (デスクトップのみ。モバイルは絞り込みパネル内に常時表示) ===== */
 function wireDatePanel() {
   const btn = document.getElementById("date-toggle");
@@ -899,6 +1104,7 @@ async function main() {
   markNewItems();
 
   buildChannelChips();
+  buildTagIndex(); // 候補の語彙。readQuery より前 (?tag= を適用する時点で揃っている必要がある)
   readQuery();
   syncChipUI();
   syncSettingsUI();
@@ -906,6 +1112,7 @@ async function main() {
   wireSettingsPanel();
   wireFilterPanel();
   wireDatePanel();
+  wireTagSuggest();
   render();
 
   if (failed.length) {

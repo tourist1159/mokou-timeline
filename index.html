@@ -28,7 +28,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="style.css?v=29" />
+  <link rel="stylesheet" href="style.css?v=30" />
 </head>
 <body>
   <header class="site-header">
@@ -90,8 +90,12 @@
         </select>
       </div>
 
+      <!-- タイトルとタグを横断して検索する。入力するとタグの候補が下に出て、
+           選ぶとそのタグを持つ動画だけに絞り込む (#tag-suggest)。 -->
       <div class="control-group search-group">
-        <input type="search" id="search" placeholder="タイトルで検索…" autocomplete="off" />
+        <input type="search" id="search" placeholder="タイトル・タグで検索…" autocomplete="off"
+               role="combobox" aria-expanded="false" aria-controls="tag-suggest" aria-autocomplete="list" />
+        <div class="tag-suggest" id="tag-suggest" role="listbox" aria-label="タグの候補"></div>
       </div>
     </div>
 
@@ -138,6 +142,10 @@
     </div>
   </div>
 
+  <!-- タグで絞り込み中だけ、解除できるチップを独立した行で出す (app.js が中身を作る)。
+       検索行に混ぜるとモバイルで検索バーを圧迫するため、あえて別の行にしている。 -->
+  <div id="active-tag" class="active-tag" hidden></div>
+
   <main id="grid" class="grid" aria-live="polite"></main>
 
   <div id="empty" class="empty" hidden>該当するアイテムがありません。</div>
@@ -147,7 +155,7 @@
   </footer>
 
   <script src="chart/chart.umd.js?v=7"></script>
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=29"></script>
   <script src="commentgraph.js?v=9"></script>
 </body>
 </html>

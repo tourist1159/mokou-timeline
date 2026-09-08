@@ -161,7 +161,85 @@ body {
   border-color: var(--text);
   font-weight: 600;
 }
-.search-group { flex: 1 1 200px; justify-content: flex-end; }
+/* position:relative はタグ候補 (.tag-suggest) の位置基準 */
+.search-group { flex: 1 1 200px; justify-content: flex-end; position: relative; }
+
+/* ---- タグ候補のサジェスト ---- */
+/* [hidden] ではなく .open で出し分ける (.settings-panel[hidden] と同じ罠を避けるため:
+   display 指定は [hidden] の既定 display:none に勝ってしまう)。 */
+.tag-suggest {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  /* モバイルは検索欄が右寄せ (justify-content:flex-end + max-width) なので、
+     left:0 だと入力欄からずれる。右端で揃える。 */
+  right: 0;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+  padding: 4px;
+}
+.tag-suggest.open { display: block; }
+.tag-suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.tag-suggest-item:hover,
+.tag-suggest-item.active { background: var(--surface-2); }
+.tag-suggest-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 件数。「もこう(53)」のように、絞り込みに効くタグかどうかの目安になる */
+.tag-suggest-count {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+
+/* ---- 絞り込み中のタグ ---- */
+.active-tag {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 10px 20px 0;
+}
+.active-tag[hidden] { display: none; }
+.active-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 6px 4px 12px;
+  font-size: 0.82rem;
+}
+.active-tag-clear {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  border-radius: 999px;
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+}
+.active-tag-clear:hover { background: var(--surface-2); color: var(--text); }
 
 /* ---- 並び順 ---- */
 .sort-select {
