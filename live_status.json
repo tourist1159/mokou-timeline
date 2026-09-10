@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-09-10T15:26:17.087062+00:00",
-  "live": []
+  "checked_at": "2026-09-10T16:49:16.773797+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "Vtuberです",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/Wk5CBhltaISY/720.webp",
+      "viewers": null
+    }
+  ]
 }
