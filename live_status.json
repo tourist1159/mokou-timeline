@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-03T06:38:09.611810+00:00",
-  "live": []
+  "checked_at": "2026-10-03T11:45:39.878457+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "CRカップ",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/a8EAPPVz7veq/720.webp?versionId=X2dan8MZSBEd.0149v9.pv2wniIKBaJO",
+      "viewers": null
+    }
+  ]
 }
