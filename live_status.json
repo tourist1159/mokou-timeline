@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-05T19:21:07.032793+00:00",
-  "live": []
+  "checked_at": "2026-10-06T01:06:30.019808+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "パチスロをしに来ました",
+      "url": "https://www.youtube.com/watch?v=kOxlC3M2Eic",
+      "videoId": "kOxlC3M2Eic",
+      "thumbnail": "https://i.ytimg.com/vi/kOxlC3M2Eic/mqdefault.jpg"
+    }
+  ]
 }
