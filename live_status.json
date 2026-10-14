@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-14T05:56:20.162167+00:00",
-  "live": []
+  "checked_at": "2026-10-14T08:00:09.245426+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "シャドバのムラッシュプロ試合をミラーする放送",
+      "url": "https://www.youtube.com/watch?v=3XFj38Phtcg",
+      "videoId": "3XFj38Phtcg",
+      "thumbnail": "https://i.ytimg.com/vi/3XFj38Phtcg/mqdefault.jpg"
+    }
+  ]
 }
