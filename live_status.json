@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-15T10:16:36.949315+00:00",
-  "live": []
+  "checked_at": "2026-10-15T12:37:47.481718+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "aaaaaa",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/MOn3dF5JikTW/720.webp?versionId=OsEcfRU_OGB36KhP4oxRddVFBO2LezWU",
+      "viewers": null
+    }
+  ]
 }
