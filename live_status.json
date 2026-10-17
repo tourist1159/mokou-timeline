@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-17T09:02:21.897180+00:00",
+  "checked_at": "2026-10-17T11:56:45.134270+00:00",
   "live": [
     {
       "platform": "youtube",
@@ -8,6 +8,14 @@
       "url": "https://www.youtube.com/watch?v=XGUOqaBsFuo",
       "videoId": "XGUOqaBsFuo",
       "thumbnail": "https://i.ytimg.com/vi/XGUOqaBsFuo/mqdefault.jpg"
+    },
+    {
+      "platform": "twitch",
+      "channel": "mokouliszt1",
+      "title": "ムラゲ対戦会",
+      "url": "https://www.twitch.tv/mokouliszt1",
+      "thumbnail": "https://static-cdn.jtvnw.net/previews-ttv/live_user_mokouliszt1-{width}x{height}.jpg",
+      "viewers": 0
     }
   ]
 }
