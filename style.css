@@ -524,26 +524,10 @@ body {
 .badge-platform.youtube { background: var(--yt); }
 .badge-platform.kick { background: var(--kick); color: #0f0f0f; }
 .badge-platform.twitch { background: var(--twitch); }
-.graph-btn {
-  margin-left: auto;
-  flex: 0 0 auto;
-  width: 26px;
-  height: 22px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  line-height: 1;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s, border-color 0.15s;
-}
-.graph-btn:hover { background: var(--surface-2); border-color: var(--hover-border); }
+/* サムネはこの <a> だけがリンクを持つ。中身 (.thumb) のレイアウト/サイズ指定が
+   そのまま効くように、自身はボックスを持たない display:contents にする。 */
+.thumb-link { display: contents; }
+.thumb-link .thumb { cursor: pointer; }
 .duration {
   position: absolute;
   bottom: 8px;
@@ -563,6 +547,7 @@ body {
   flex-direction: column;
   gap: 8px;
   flex: 1;
+  cursor: pointer; /* クリックで詳細ポップアップを開く (サムネはここに含まれない) */
 }
 .card-title {
   font-size: 0.92rem;
@@ -675,10 +660,44 @@ body {
 .graph-modal-body {
   padding: 16px;
   overflow-y: auto;
-  min-height: 200px;
+  min-height: 120px;
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
+  gap: 16px;
 }
+.detail-info {
+  margin-top: 0;
+  font-size: 0.85rem;
+}
+.detail-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.detail-tags[hidden] { display: none; }
+.detail-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.tag-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.detail-graph {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 160px;
+}
+/* display:flex を明示しているため [hidden] の既定 display:none が上書きされてしまう
+   (他の要素と同じ罠。.graph-modal-backdrop[hidden] 参照)。 */
+.detail-graph[hidden] { display: none; }
 .graph-modal-status {
   margin: auto;
   color: var(--text-dim);
@@ -712,7 +731,7 @@ body {
 }
 .keyword-editor-summary {
   cursor: pointer;
-  padding: 8px 16px;
+  padding: 8px 0;
   font-size: 0.8rem;
   color: var(--text-dim);
   list-style: none;
@@ -723,7 +742,7 @@ body {
 .keyword-editor[open] .keyword-editor-summary::before { content: "▾ "; }
 .keyword-editor-summary:hover { color: var(--text); }
 .keyword-editor-body {
-  padding: 0 16px 14px;
+  padding: 0 0 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;

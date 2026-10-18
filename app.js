@@ -488,19 +488,25 @@ function makePlaceholder(item) {
 }
 
 function makeCard(item) {
-  // 削除済みの動画はリンクにしない (クリックしても404になるだけのため)
-  const card = document.createElement(item.available ? "a" : "div");
+  // カード全体は div にし、サムネだけ元動画へのリンクにする
+  // (それ以外の部分をクリックすると詳細ポップアップを開くため、動作を分ける)。
+  // 削除済みの動画はサムネもリンクにしない (クリックしても404になるだけのため)。
+  const card = document.createElement("div");
   card.className = item.available ? "card" : "card unavailable";
   if (item.isLive) card.classList.add("live");
-  if (item.available) {
-    card.href = item.url;
-    card.target = "_blank";
-    card.rel = "noopener noreferrer";
-  } else {
-    card.title = "この動画は配信元で削除されています";
-  }
+  if (!item.available) card.title = "この動画は配信元で削除されています";
 
-  card.appendChild(makeThumb(item));
+  if (item.available) {
+    const thumbLink = document.createElement("a");
+    thumbLink.className = "thumb-link";
+    thumbLink.href = item.url;
+    thumbLink.target = "_blank";
+    thumbLink.rel = "noopener noreferrer";
+    thumbLink.appendChild(makeThumb(item));
+    card.appendChild(thumbLink);
+  } else {
+    card.appendChild(makeThumb(item));
+  }
 
   // 配信中はカードの赤枠の上に LIVE バッジを重ねる
   if (item.isLive) {
@@ -549,8 +555,7 @@ function makeCard(item) {
   }
 
   // コメント数。クリックで「総数 ⇄ 1時間あたり(流れの速さ)」を全カードまとめて切り替える。
-  // カード自体が <a> なので、押しても動画へ飛ばないよう preventDefault する
-  // (グラフボタンと同じ作り)。
+  // card-body 自体がクリックで詳細ポップアップを開くので、それが開かないよう stopPropagation する。
   if (state.showComments && item.comments != null) {
     const rate = commentRate(item);
     const showRate = state.commentMode === "rate" && rate != null;
@@ -578,23 +583,10 @@ function makeCard(item) {
     meta.appendChild(del);
   }
 
-  // コメントデータがある配信のみ、流量グラフを開くボタンを表示（説明部分の右側）
-  if (state.showComments && item.comments != null && item.comments > 0) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "graph-btn";
-    btn.title = "コメント流量グラフを見る";
-    btn.setAttribute("aria-label", "コメント流量グラフを見る");
-    btn.textContent = "📊";
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      window.openCommentGraph(item);
-    });
-    meta.appendChild(btn);
-  }
-
   body.appendChild(meta);
+  // サムネイル以外 (card-body全体) をクリックすると詳細ポップアップを開く。
+  // 内側のコメント数ボタンは自前で stopPropagation しているのでここには来ない。
+  body.addEventListener("click", () => window.openItemDetail(item));
   card.appendChild(body);
   return card;
 }

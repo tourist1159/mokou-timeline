@@ -1,10 +1,13 @@
 "use strict";
 
 /*
- * コメント流量グラフ（モーダル表示）
- * カードの📊ボタンから開き、該当配信のコメントJSONを取得して1分バケットのグラフを描く。
- * 集計ロジックは拡張機能 sortcomments/commentgraph.js・kick-extension/js/commentchart.js の
- * 移植（重複除去→1分バケット→キーワード別カウント）。埋め込みプレイヤーは持たないため
+ * 詳細情報ポップアップ（カードのサムネ以外をクリックすると開くモーダル）
+ * 日時・種別・再生数・コメント数などカードに出ている情報に加え、YouTubeの動画/配信は
+ * タグを、配信はコメント流量グラフを表示する。
+ *
+ * グラフ部分は該当配信のコメントJSONを取得して1分バケットで描く。集計ロジックは拡張機能
+ * sortcomments/commentgraph.js・kick-extension/js/commentchart.js の移植
+ * （重複除去→1分バケット→キーワード別カウント）。埋め込みプレイヤーは持たないため
  * currentTime連動やクリックシークは無い。
  *
  * キーワードはモーダル内の「キーワード集計」パネルでユーザーが編集でき、
@@ -68,7 +71,7 @@ let modalEls = null; // 初回オープン時に生成して使い回す
 let currentChart = null;
 let requestSeq = 0; // 連打時、古いレスポンスの描画を防ぐ
 // キーワード編集時の再集計 (rerenderChart) 用。現在開いているグラフの重複除去済み
-// コメントと配信長を持つ (モーダルを閉じたら closeCommentGraph が null に戻す)。
+// コメントと配信長を持つ (モーダルを閉じたら closeDetail が null に戻す)。
 let lastFiltered = null;
 let lastOffsetSec = null;
 let lastItem = null;
@@ -94,15 +97,44 @@ function buildModal() {
   closeBtn.className = "graph-modal-close";
   closeBtn.setAttribute("aria-label", "閉じる");
   closeBtn.textContent = "×";
-  closeBtn.addEventListener("click", closeCommentGraph);
+  closeBtn.addEventListener("click", closeDetail);
 
   header.appendChild(title);
   header.appendChild(closeBtn);
 
-  const keywordEditor = buildKeywordEditor();
-
   const body = document.createElement("div");
   body.className = "graph-modal-body";
+
+  // カードに出ている情報 (日時・種別・再生数・コメント数など) を並べる行
+  const infoBox = document.createElement("div");
+  infoBox.className = "card-meta detail-info";
+  body.appendChild(infoBox);
+
+  // タグ (YouTube の動画/配信のみ。無ければ非表示)
+  const tagsBox = document.createElement("div");
+  tagsBox.className = "detail-tags";
+  tagsBox.hidden = true;
+  const tagsLabel = document.createElement("div");
+  tagsLabel.className = "detail-section-title";
+  tagsLabel.textContent = "🏷 タグ";
+  const tagsList = document.createElement("div");
+  tagsList.className = "detail-tags-list";
+  tagsBox.appendChild(tagsLabel);
+  tagsBox.appendChild(tagsList);
+  body.appendChild(tagsBox);
+
+  // コメント流量グラフ (配信のみ。動画は非表示)
+  const graphSection = document.createElement("div");
+  graphSection.className = "detail-graph";
+  graphSection.hidden = true;
+
+  const graphLabel = document.createElement("div");
+  graphLabel.className = "detail-section-title";
+  graphLabel.textContent = "📊 コメント流量";
+  graphSection.appendChild(graphLabel);
+
+  const keywordEditor = buildKeywordEditor();
+  graphSection.appendChild(keywordEditor.details);
 
   const status = document.createElement("div");
   status.className = "graph-modal-status";
@@ -113,8 +145,9 @@ function buildModal() {
   const canvas = document.createElement("canvas");
   chartWrap.appendChild(canvas);
 
-  body.appendChild(status);
-  body.appendChild(chartWrap);
+  graphSection.appendChild(status);
+  graphSection.appendChild(chartWrap);
+  body.appendChild(graphSection);
 
   const footer = document.createElement("div");
   footer.className = "graph-modal-footer";
@@ -125,20 +158,80 @@ function buildModal() {
   footer.appendChild(link);
 
   panel.appendChild(header);
-  panel.appendChild(keywordEditor.details);
   panel.appendChild(body);
   panel.appendChild(footer);
   backdrop.appendChild(panel);
   document.body.appendChild(backdrop);
 
   backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) closeCommentGraph();
+    if (e.target === backdrop) closeDetail();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !backdrop.hidden) closeCommentGraph();
+    if (e.key === "Escape" && !backdrop.hidden) closeDetail();
   });
 
-  return { backdrop, panel, title, status, chartWrap, canvas, link, keywordEditor };
+  return {
+    backdrop, panel, title, infoBox, tagsBox, tagsList,
+    graphSection, status, chartWrap, canvas, link, keywordEditor,
+  };
+}
+
+// ---- 情報行・タグの描画 ----
+function renderInfoBox(infoBox, item) {
+  infoBox.textContent = "";
+
+  const date = document.createElement("span");
+  date.className = "card-date";
+  date.textContent = item.isLive ? "配信中" : fmtDate(item.start);
+  infoBox.appendChild(date);
+
+  const typeTag = document.createElement("span");
+  typeTag.className = "tag " + item.type;
+  typeTag.textContent = item.type === "stream" ? "配信" : "動画";
+  infoBox.appendChild(typeTag);
+
+  if (item.membersOnly) {
+    const m = document.createElement("span");
+    m.className = "tag members";
+    m.textContent = "メン限";
+    infoBox.appendChild(m);
+  }
+
+  if (item.views != null) {
+    const v = document.createElement("span");
+    v.className = "views";
+    v.textContent = fmtCount(item.views);
+    v.title = `${item.views.toLocaleString()}回視聴`;
+    infoBox.appendChild(v);
+  }
+
+  if (item.comments != null) {
+    const rate = commentRate(item);
+    const c = document.createElement("span");
+    c.textContent = rate != null
+      ? `💬 ${fmtCount(item.comments)}件（1時間あたり約${fmtCount(Math.round(rate))}）`
+      : `💬 ${fmtCount(item.comments)}件`;
+    infoBox.appendChild(c);
+  }
+
+  if (!item.available) {
+    const del = document.createElement("span");
+    del.className = "tag deleted";
+    del.textContent = "削除済み";
+    infoBox.appendChild(del);
+  }
+}
+
+function renderTagsBox(tagsBox, tagsList, item) {
+  tagsList.textContent = "";
+  const tags = item.tags || [];
+  tagsBox.hidden = tags.length === 0;
+  for (const t of tags) {
+    const chip = document.createElement("span");
+    chip.className = "tag-chip";
+    chip.textContent = t; // textContent で XSS 回避
+    tagsList.appendChild(chip);
+  }
 }
 
 // ---- キーワード集計の編集パネル ----
@@ -261,7 +354,7 @@ function onKeywordsChanged(editor) {
   rerenderChart();
 }
 
-function closeCommentGraph() {
+function closeDetail() {
   if (!modalEls) return;
   modalEls.backdrop.hidden = true;
   if (currentChart) {
@@ -450,9 +543,9 @@ function renderChart(canvas, agg, item, link, keywords) {
   });
 }
 
-async function openCommentGraph(item) {
+async function openItemDetail(item) {
   if (!modalEls) modalEls = buildModal();
-  const { backdrop, title, status, chartWrap, canvas, link } = modalEls;
+  const { backdrop, title, infoBox, tagsBox, tagsList, graphSection, status, chartWrap, canvas, link } = modalEls;
   const seq = ++requestSeq;
 
   if (currentChart) {
@@ -461,14 +554,25 @@ async function openCommentGraph(item) {
     } catch (e) {}
     currentChart = null;
   }
+  lastFiltered = null;
+  lastOffsetSec = null;
+  lastItem = null;
 
   title.textContent = item.title;
-  link.textContent = item.platform === "youtube" ? "YouTubeで開く" : "Kickで開く";
+  link.textContent = `${platformLabel(item.platform)}で開く`;
   link.href = item.url;
+  renderInfoBox(infoBox, item);
+  renderTagsBox(tagsBox, tagsList, item);
+  backdrop.hidden = false;
+
+  // コメント流量グラフは配信のみ (動画には出さない)
+  const isStream = item.type === "stream";
+  graphSection.hidden = !isStream;
+  if (!isStream) return;
+
   chartWrap.hidden = true;
   status.hidden = false;
   status.textContent = "読み込み中…";
-  backdrop.hidden = false;
 
   if (typeof window.Chart === "undefined") {
     status.textContent = "グラフライブラリの読み込みに失敗しました。";
@@ -511,7 +615,7 @@ async function openCommentGraph(item) {
     currentChart = renderChart(canvas, bucketComments(filtered, lastOffset, currentKeywords), item, link, currentKeywords);
   } catch (e) {
     if (seq !== requestSeq) return;
-    console.error("[CommentGraph]", e);
+    console.error("[Detail]", e);
     status.textContent = "コメントデータの取得に失敗しました。";
   }
 }
@@ -532,4 +636,4 @@ function rerenderChart() {
   );
 }
 
-window.openCommentGraph = openCommentGraph;
+window.openItemDetail = openItemDetail;
