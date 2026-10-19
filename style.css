@@ -870,7 +870,12 @@ body {
   .date-items.view-list .thumb { flex: 0 0 120px; width: 120px; }
   .date-items.view-list .card-body { padding: 6px 10px; }
   /* 狭い画面では日付ラベルを上に横並びで置く (左に幅を割くと窮屈なため) */
-  .date-group { flex-direction: column; gap: 6px; }
+  /* align-items はデスクトップの横並び用に flex-start のままなので、縦並びでは
+     明示的に stretch し直す。しないと日付グループに1件だけ(ライブ中など)のとき、
+     カードが幅いっぱいに広がらずタイトルの長さなりに縮んでしまう
+     (グリッド表示は auto-fill の track 計算で偶然目立たないが、リスト表示だと
+     カードの実寸がそのまま縮むため顕著だった)。 */
+  .date-group { flex-direction: column; align-items: stretch; gap: 6px; }
   /* flex:0 0 76px はデスクトップの横幅指定のつもりだったが、モバイルは
      flex-direction:column で主軸が縦になるため、76px が「高さ」として効いて
      ラベルの箱が縦に間延びしていた (実測: テキストは20px程度なのに76px確保)。
