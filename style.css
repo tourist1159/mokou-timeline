@@ -1026,11 +1026,12 @@ body {
 .card.live:hover {
   box-shadow: 0 0 26px rgba(255, 61, 61, 0.35);
 }
-/* LIVE はサムネ右上に乗せる (サムネの外にはみ出させず、プラットフォームバッジと左右対称)。
-   カード上辺の枠にまたがる置き方だと、モバイルの日付見出しやバッジと重なってしまうため。 */
+/* LIVE はサムネ右下 (.duration と同じ位置) に乗せる。配信中は長さが出せず .duration も
+   表示されないのでここは必ず空いている。右上だと YouTube のように文字数の多いプラット
+   フォームバッジ (badge-platform) とモバイルのリスト表示(細いサムネ)で重なってしまうため。 */
 .live-dot {
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   right: 8px;
   background: #ff3d3d;
   color: #fff;
