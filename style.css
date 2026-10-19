@@ -984,28 +984,22 @@ body {
 
 /* ---- 配信中のカード (タイムラインの中に他のカードと同じ形で並ぶ) ---- */
 .card.live {
-  /* 通常カードは1px。ライブだけ赤枠+グローで目立たせる。枠が太くなるぶんの
-     ガタつきを避けるため、border-width の差は margin で吸収する。 */
+  /* border の太さを変えると (margin で打ち消しても) CSS Grid の stretch 計算と噛み合わず
+     他のカードとサイズがズレるため、box-sizing に影響しない outline で赤枠を表現する。 */
   position: relative;
-  border: 2px solid #ff3d3d;
-  margin: -1px;
+  outline: 2px solid #ff3d3d;
+  outline-offset: -1px;
   box-shadow: 0 0 20px rgba(255, 61, 61, 0.18);
-  overflow: visible; /* LIVE バッジを枠の外にはみ出させるため */
 }
 .card.live:hover {
-  border-color: #ff3d3d;
   box-shadow: 0 0 26px rgba(255, 61, 61, 0.35);
 }
-/* 角丸が overflow:visible で効かなくなるぶんはサムネ側で丸める */
-.card.live .thumb {
-  border-radius: calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;
-}
-/* LIVE はサムネ内ではなくカード上辺の赤枠に重ねる */
+/* LIVE はサムネ右上に乗せる (サムネの外にはみ出させず、プラットフォームバッジと左右対称)。
+   カード上辺の枠にまたがる置き方だと、モバイルの日付見出しやバッジと重なってしまうため。 */
 .live-dot {
   position: absolute;
-  top: 0;
-  left: 14px;
-  transform: translateY(-50%);
+  top: 8px;
+  right: 8px;
   background: #ff3d3d;
   color: #fff;
   font-size: 0.7rem;
@@ -1019,9 +1013,4 @@ body {
 @keyframes live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
-}
-/* リスト表示ではサムネが左側なので、丸めるのは左の角 */
-#grid.view-list .card.live .thumb,
-.date-items.view-list .card.live .thumb {
-  border-radius: calc(var(--radius) - 2px) 0 0 calc(var(--radius) - 2px);
 }

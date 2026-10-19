@@ -496,24 +496,26 @@ function makeCard(item) {
   if (item.isLive) card.classList.add("live");
   if (!item.available) card.title = "この動画は配信元で削除されています";
 
+  const thumb = makeThumb(item);
+  // 配信中はサムネ右上に LIVE バッジを重ねる (サムネの子にすることで、
+  // グリッド/リストどちらの配置でもサムネの右上に正しく追従する)。
+  if (item.isLive) {
+    const dot = document.createElement("span");
+    dot.className = "live-dot";
+    dot.textContent = "LIVE";
+    thumb.appendChild(dot);
+  }
+
   if (item.available) {
     const thumbLink = document.createElement("a");
     thumbLink.className = "thumb-link";
     thumbLink.href = item.url;
     thumbLink.target = "_blank";
     thumbLink.rel = "noopener noreferrer";
-    thumbLink.appendChild(makeThumb(item));
+    thumbLink.appendChild(thumb);
     card.appendChild(thumbLink);
   } else {
-    card.appendChild(makeThumb(item));
-  }
-
-  // 配信中はカードの赤枠の上に LIVE バッジを重ねる
-  if (item.isLive) {
-    const dot = document.createElement("span");
-    dot.className = "live-dot";
-    dot.textContent = "LIVE";
-    card.appendChild(dot);
+    card.appendChild(thumb);
   }
 
   const body = document.createElement("div");
