@@ -33,8 +33,9 @@ const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
   // 期間フィルタ ("YYYY-MM-DD" / 未指定は空文字)。JST基準の日付キーと文字列比較する。
   from: "", to: "",
-  // タグでの絞り込み (候補から選んだタグ名そのまま / 未指定は空文字)
-  tag: "",
+  // タグでの絞り込み (候補から選んだ/詳細ポップアップでクリックしたタグ名の配列。
+  // 複数指定時は OR = いずれか1つでも付いていれば一致)
+  tags: [],
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
   onlyAvailable: false,
   // カードのコメント欄の表示 "total"=総数 / "rate"=1時間あたり。クリックで切り替える。
@@ -378,8 +379,9 @@ function matchesQuery(item, q) {
 
 function applyFilters() {
   const q = normalizeText(state.q);
-  // タグは候補から選んだ1つに厳密一致で絞る (自由入力の部分一致とは別扱い)
-  const tagNorm = normalizeText(state.tag);
+  // タグは候補から選んだ/クリックしたものに厳密一致で絞る (自由入力の部分一致とは別扱い)。
+  // 複数あれば OR (いずれか1つでも付いていれば一致)。
+  const tagsNorm = state.tags.map(normalizeText).filter(Boolean);
   const live = liveItems();
   // 同じ配信がアーカイブ側にも載っていることがある。Kick は配信中からVODが作られるため
   // 常に、YouTube は配信終了直後(収集がライブ判定より早いとき)に起きる。ライブ側を優先する。
@@ -394,7 +396,7 @@ function applyFilters() {
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
-    if (tagNorm && !(x.tags || []).some((t) => normalizeText(t) === tagNorm)) return false;
+    if (tagsNorm.length && !(x.tags || []).some((t) => tagsNorm.includes(normalizeText(t)))) return false;
     // 期間は JST の日付キー ("YYYY-MM-DD") 同士の文字列比較で判定する。ゼロ埋め固定長
     // なので辞書順＝日付順になり、タイムゾーン計算をせずに端の日を「その日いっぱい」
     // 含められる (タイムライン側の日付グループとも同じ基準になる)。
@@ -739,8 +741,12 @@ function buildChannelChips() {
 /* ===== URL クエリ同期 ===== */
 function readQuery() {
   const p = new URLSearchParams(location.search);
-  for (const k of ["platform", "channel", "type", "order", "q", "from", "to", "tag"]) {
+  for (const k of ["platform", "channel", "type", "order", "q", "from", "to"]) {
     if (p.has(k)) state[k] = p.get(k);
+  }
+  // タグはカンマ区切りで複数指定 (?tag=a,b)
+  if (p.has("tag")) {
+    state.tags = p.get("tag").split(",").map((s) => s.trim()).filter(Boolean);
   }
   // 壊れた値 (手で編集された共有URL等) はフィルタを効かせず素通りさせる
   for (const k of ["from", "to"]) {
@@ -765,7 +771,7 @@ function writeQuery() {
   if (state.q) p.set("q", state.q);
   if (state.from) p.set("from", state.from);
   if (state.to) p.set("to", state.to);
-  if (state.tag) p.set("tag", state.tag);
+  if (state.tags.length) p.set("tag", state.tags.join(","));
   const qs = p.toString();
   history.replaceState(null, "", qs ? "?" + qs : location.pathname);
 }
@@ -790,33 +796,36 @@ function syncChipUI() {
   syncFilterButton();
 }
 
-// タグで絞り込み中だけ「🏷 タグ名 ✕」のチップを出す。
+// タグで絞り込み中だけ、選択中のタグ1つにつき「🏷 タグ名 ✕」のチップを出す (OR条件なので複数可)。
 // ✕ の解除は #active-tag への委譲リスナー (wireEvents) が拾うので、ここでは作るだけ。
 function renderActiveTag() {
   const box = document.getElementById("active-tag");
   box.textContent = "";
-  if (!state.tag) {
+  if (!state.tags.length) {
     box.hidden = true;
     return;
   }
   box.hidden = false;
 
-  const chip = document.createElement("span");
-  chip.className = "active-tag-chip";
+  for (const tag of state.tags) {
+    const chip = document.createElement("span");
+    chip.className = "active-tag-chip";
+    chip.dataset.tag = tag;
 
-  const label = document.createElement("span");
-  label.className = "active-tag-label";
-  label.textContent = `🏷 ${state.tag}`; // textContent で XSS 回避
-  chip.appendChild(label);
+    const label = document.createElement("span");
+    label.className = "active-tag-label";
+    label.textContent = `🏷 ${tag}`; // textContent で XSS 回避
+    chip.appendChild(label);
 
-  const clear = document.createElement("button");
-  clear.type = "button";
-  clear.className = "active-tag-clear";
-  clear.textContent = "✕";
-  clear.setAttribute("aria-label", `タグ「${state.tag}」の絞り込みを解除`);
-  chip.appendChild(clear);
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "active-tag-clear";
+    clear.textContent = "✕";
+    clear.setAttribute("aria-label", `タグ「${tag}」の絞り込みを解除`);
+    chip.appendChild(clear);
 
-  box.appendChild(chip);
+    box.appendChild(chip);
+  }
 }
 
 // モバイルでは絞り込みチップが畳まれていて見えないので、いくつ効いているかをボタンに出す。
@@ -873,10 +882,13 @@ function wireEvents() {
     refreshTagSuggest(); // 入力のたびにタグ候補も出し直す
   });
 
-  // タグの絞り込み解除 (チップは syncChipUI が毎回作り直すので委譲で拾う)
+  // タグの絞り込み解除 (チップは syncChipUI が毎回作り直すので委譲で拾う)。
+  // 複数選択中はクリックしたチップのタグだけを外す。
   document.getElementById("active-tag").addEventListener("click", (e) => {
-    if (!e.target.closest(".active-tag-clear")) return;
-    state.tag = "";
+    const clearBtn = e.target.closest(".active-tag-clear");
+    if (!clearBtn) return;
+    const tag = clearBtn.closest(".active-tag-chip").dataset.tag;
+    state.tags = state.tags.filter((t) => t !== tag);
     syncChipUI();
     writeQuery();
     render();
@@ -1043,8 +1055,13 @@ function highlightSuggest(next) {
   rows[suggestActive].scrollIntoView({ block: "nearest" });
 }
 
+// タグを絞り込みに追加する (検索欄のタグ候補、詳細ポップアップのタグクリックの両方から呼ばれる)。
+// 複数選択なので OR で追加していく。既に選択済みのタグは何もしない (二重追加を防ぐだけ)。
 function selectTag(label) {
-  state.tag = label;
+  const norm = normalizeText(label);
+  if (!state.tags.some((t) => normalizeText(t) === norm)) {
+    state.tags.push(label);
+  }
   state.q = ""; // タグで絞ったらフリーワードは持ち越さない (二重に絞られると分かりにくい)
   closeTagSuggest();
   syncChipUI();

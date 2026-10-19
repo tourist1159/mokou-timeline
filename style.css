@@ -210,11 +210,14 @@ body {
   font-size: 0.74rem;
 }
 
-/* ---- 絞り込み中のタグ ---- */
+/* ---- 絞り込み中のタグ (複数選択時は OR。チップごとに外せる) ---- */
 .active-tag {
   max-width: 1400px;
   margin: 0 auto;
   padding: 10px 20px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .active-tag[hidden] { display: none; }
 .active-tag-chip {
@@ -681,6 +684,7 @@ body {
   gap: 6px;
   margin-top: 6px;
 }
+/* クリックでそのタグの絞り込みに追加できる (複数選べて OR で効く) */
 .tag-chip {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -688,6 +692,15 @@ body {
   padding: 3px 10px;
   font-size: 0.78rem;
   color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tag-chip:hover { background: var(--surface); border-color: var(--hover-border); }
+/* 既にそのタグで絞り込み中であることを示す */
+.tag-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .detail-graph {
   display: flex;

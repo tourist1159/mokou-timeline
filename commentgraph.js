@@ -227,9 +227,19 @@ function renderTagsBox(tagsBox, tagsList, item) {
   const tags = item.tags || [];
   tagsBox.hidden = tags.length === 0;
   for (const t of tags) {
-    const chip = document.createElement("span");
+    const chip = document.createElement("button");
+    chip.type = "button";
     chip.className = "tag-chip";
+    // 既にそのタグで絞り込み中なら見た目で示す (selectTag/state.tags は app.js 側)
+    if (state.tags.some((st) => normalizeText(st) === normalizeText(t))) {
+      chip.classList.add("active");
+    }
     chip.textContent = t; // textContent で XSS 回避
+    chip.title = `タグ「${t}」で絞り込む`;
+    chip.addEventListener("click", () => {
+      selectTag(t);
+      closeDetail();
+    });
     tagsList.appendChild(chip);
   }
 }
