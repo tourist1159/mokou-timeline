@@ -243,6 +243,20 @@ body {
   cursor: pointer;
 }
 .active-tag-clear:hover { background: var(--surface-2); color: var(--text); }
+/* 2つ以上選んでいるときだけ出る、まとめて全解除するボタン */
+.active-tag-reset-all {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+}
+.active-tag-reset-all:hover { background: var(--surface-2); color: var(--text); }
 
 /* ---- 並び順 ---- */
 .sort-select {

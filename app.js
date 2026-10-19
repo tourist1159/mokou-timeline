@@ -826,6 +826,16 @@ function renderActiveTag() {
 
     box.appendChild(chip);
   }
+
+  // 2つ以上選んでいるときだけ、まとめて全解除するボタンを出す
+  // (1つだけならチップ自身の✕と同じ意味になり重複するため)。
+  if (state.tags.length > 1) {
+    const resetAll = document.createElement("button");
+    resetAll.type = "button";
+    resetAll.className = "active-tag-reset-all";
+    resetAll.textContent = "タグをすべて解除";
+    box.appendChild(resetAll);
+  }
 }
 
 // モバイルでは絞り込みチップが畳まれていて見えないので、いくつ効いているかをボタンに出す。
@@ -882,9 +892,16 @@ function wireEvents() {
     refreshTagSuggest(); // 入力のたびにタグ候補も出し直す
   });
 
-  // タグの絞り込み解除 (チップは syncChipUI が毎回作り直すので委譲で拾う)。
-  // 複数選択中はクリックしたチップのタグだけを外す。
+  // タグの絞り込み解除 (チップ/全解除ボタンは syncChipUI が毎回作り直すので委譲で拾う)。
+  // 個別チップの✕はそのタグだけ、「すべて解除」ボタンは全部外す。
   document.getElementById("active-tag").addEventListener("click", (e) => {
+    if (e.target.closest(".active-tag-reset-all")) {
+      state.tags = [];
+      syncChipUI();
+      writeQuery();
+      render();
+      return;
+    }
     const clearBtn = e.target.closest(".active-tag-clear");
     if (!clearBtn) return;
     const tag = clearBtn.closest(".active-tag-chip").dataset.tag;
