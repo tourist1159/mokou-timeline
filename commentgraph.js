@@ -17,7 +17,7 @@
  */
 
 const KEYWORDS_KEY = "mokou-timeline:keywords";
-const DEFAULT_KEYWORDS = ["草|w", "8{3,}", "^あ+$"];
+const DEFAULT_KEYWORDS = ["w", "^あ$"];
 // ダーク背景向けの原色はライトテーマの白背景では視認性が落ちる(特に cyan)ため、
 // テーマごとに別の色セットを用意する (chartPalette 参照)。キーワード数がこれより
 // 多い場合は色を使い回す (renderChart/renderKeywordRows で % による循環)。
@@ -260,7 +260,7 @@ function buildKeywordEditor() {
   const hint = document.createElement("p");
   hint.className = "keyword-editor-hint";
   hint.textContent =
-    "正規表現でキーワードを指定できます（例: 草|w、8{3,}、^あ+$）。1分ごとの出現回数を数え、" +
+    "正規表現でキーワードを指定できます（例: w、^あ$）。1分ごとの出現回数を数え、" +
     "全コメント数のグラフに重ねて表示します。";
   bodyEl.appendChild(hint);
 
@@ -327,7 +327,7 @@ function renderKeywordRows(editor) {
     const input = document.createElement("input");
     input.type = "text";
     input.value = word;
-    input.placeholder = "正規表現 (例: 草|w)";
+    input.placeholder = "正規表現 (例: w)";
     input.className = "keyword-editor-input";
     input.setAttribute("aria-label", `キーワード ${i + 1}`);
     if (word.trim() !== "" && !isValidRegex(word)) input.classList.add("invalid");
