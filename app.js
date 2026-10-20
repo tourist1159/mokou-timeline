@@ -24,8 +24,8 @@ const CONFIG = {
 
 /* ===== 状態 ===== */
 // 並び順の一覧 (index.html の <select id="sort-select"> と対応)。
-// desc/asc は日付順、views/comments/rate は「多い順・速い順」。
-const SORT_ORDERS = ["desc", "asc", "views", "comments", "rate"];
+// desc/asc は日付順、views/likes/comments/rate は「多い順・速い順」。
+const SORT_ORDERS = ["desc", "asc", "views", "likes", "comments", "rate"];
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
 // view/timeline/newMarker/showComments/theme/onlyAvailable は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
@@ -185,6 +185,14 @@ function fmtCount(n) {
   if (typeof n !== "number" || !isFinite(n)) return "";
   if (n >= 100000000) return `${(n / 100000000).toFixed(1).replace(/\.0$/, "")}億`;
   if (n >= 10000) return `${(n / 10000).toFixed(1).replace(/\.0$/, "")}万`;
+  return n.toLocaleString();
+}
+// 高評価数は再生数ほど桁が大きくならないので、千の位から短縮する (例: 1085 → 1.1千)。
+function fmtLikeCount(n) {
+  if (typeof n !== "number" || !isFinite(n)) return "";
+  if (n >= 100000000) return `${(n / 100000000).toFixed(1).replace(/\.0$/, "")}億`;
+  if (n >= 10000) return `${(n / 10000).toFixed(1).replace(/\.0$/, "")}万`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}千`;
   return n.toLocaleString();
 }
 
@@ -417,13 +425,12 @@ function applyFilters() {
 }
 
 // 並び順。日付順 (desc/asc) 以外は「数の多い順」で、値を持たないものは末尾へ送る
-// (再生数は YouTube のみ、コメント数は取得済みのものだけなので、0 扱いにすると
+// (再生数・高評価数は YouTube のみ、コメント数は取得済みのものだけなので、0 扱いにすると
 // 「0回再生」と「未取得」が混ざってしまう)。同値・欠損同士は新しい順で安定させる。
 function sortComparator(order) {
-  if (order === "views" || order === "comments" || order === "rate") {
+  if (order === "views" || order === "likes" || order === "comments" || order === "rate") {
     // rate は保存された値ではなくその場で計算する (コメント数 ÷ 長さ)
-    const valueOf =
-      order === "rate" ? commentRate : (x) => x[order === "views" ? "views" : "comments"];
+    const valueOf = order === "rate" ? commentRate : (x) => x[order];
     return (a, b) => {
       const av = valueOf(a);
       const bv = valueOf(b);
@@ -561,10 +568,11 @@ function makeCard(item) {
     meta.appendChild(v);
   }
 
-  if (item.likes != null) {
+  // 配信カードは既にビュー数・コメント数でメタ行が混み合うので、高評価数は動画のみ出す。
+  if (item.likes != null && item.type !== "stream") {
     const l = document.createElement("span");
     l.className = "likes";
-    l.textContent = fmtCount(item.likes);
+    l.textContent = fmtLikeCount(item.likes);
     l.title = `${item.likes.toLocaleString()}件の高評価`;
     meta.appendChild(l);
   }

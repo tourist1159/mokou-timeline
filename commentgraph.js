@@ -208,7 +208,7 @@ function renderInfoBox(infoBox, item) {
   if (item.likes != null) {
     const l = document.createElement("span");
     l.className = "likes";
-    l.textContent = fmtCount(item.likes);
+    l.textContent = fmtLikeCount(item.likes);
     l.title = `${item.likes.toLocaleString()}件の高評価`;
     infoBox.appendChild(l);
   }
