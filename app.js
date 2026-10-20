@@ -240,6 +240,8 @@ function normalizeYouTube(arr) {
     // 動画のタグ(キーワード)。YouTube のみで、fetcher が12時間ごとに取り直す。
     // Kick/Twitch には無いので、参照側は x.tags || [] で守る。
     tags: Array.isArray(v.tags) ? v.tags : [],
+    // 概要欄全文。YouTube のみ、空なら null (詳細ポップアップで動画のみ表示)
+    description: typeof v.description === "string" && v.description ? v.description : null,
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
     available: v.available !== false, // フラグ未設定は視聴可能とみなす
     commentsKey: v.video_id, // comments_github/<commentsKey>_comments.json

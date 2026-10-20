@@ -123,6 +123,19 @@ function buildModal() {
   tagsBox.appendChild(tagsList);
   body.appendChild(tagsBox);
 
+  // 概要欄 (YouTube の動画 (type:"video") のみ。配信・概要欄が無い場合は非表示)
+  const descriptionBox = document.createElement("div");
+  descriptionBox.className = "detail-description-box";
+  descriptionBox.hidden = true;
+  const descriptionLabel = document.createElement("div");
+  descriptionLabel.className = "detail-section-title";
+  descriptionLabel.textContent = "📝 概要欄";
+  const descriptionText = document.createElement("div");
+  descriptionText.className = "detail-description";
+  descriptionBox.appendChild(descriptionLabel);
+  descriptionBox.appendChild(descriptionText);
+  body.appendChild(descriptionBox);
+
   // コメント流量グラフ (配信のみ。動画は非表示)
   const graphSection = document.createElement("div");
   graphSection.className = "detail-graph";
@@ -172,6 +185,7 @@ function buildModal() {
 
   return {
     backdrop, panel, title, infoBox, tagsBox, tagsList,
+    descriptionBox, descriptionText,
     graphSection, status, chartWrap, canvas, link, keywordEditor,
   };
 }
@@ -250,6 +264,14 @@ function renderTagsBox(tagsBox, tagsList, item) {
     });
     tagsList.appendChild(chip);
   }
+}
+
+// 概要欄は動画 (type:"video") のみ表示。配信は含めない (①ユーザーの要望、
+// ②配信アーカイブの概要欄はチャンネル共通の定型文であることが多く情報量が薄いため)。
+function renderDescriptionBox(descriptionBox, descriptionText, item) {
+  const show = item.type === "video" && !!item.description;
+  descriptionBox.hidden = !show;
+  descriptionText.textContent = show ? item.description : ""; // textContent で XSS 回避
 }
 
 // ---- キーワード集計の編集パネル ----
@@ -563,7 +585,10 @@ function renderChart(canvas, agg, item, link, keywords) {
 
 async function openItemDetail(item) {
   if (!modalEls) modalEls = buildModal();
-  const { backdrop, title, infoBox, tagsBox, tagsList, graphSection, status, chartWrap, canvas, link } = modalEls;
+  const {
+    backdrop, title, infoBox, tagsBox, tagsList, descriptionBox, descriptionText,
+    graphSection, status, chartWrap, canvas, link,
+  } = modalEls;
   const seq = ++requestSeq;
 
   if (currentChart) {
@@ -581,6 +606,7 @@ async function openItemDetail(item) {
   link.href = item.url;
   renderInfoBox(infoBox, item);
   renderTagsBox(tagsBox, tagsList, item);
+  renderDescriptionBox(descriptionBox, descriptionText, item);
   backdrop.hidden = false;
 
   // コメント流量グラフは配信のみ (動画には出さない)

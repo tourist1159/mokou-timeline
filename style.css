@@ -700,6 +700,21 @@ body {
   gap: 6px;
   margin-top: 6px;
 }
+.detail-description-box[hidden] { display: none; }
+/* 長文になりうるので、折り返しは保ちつつ高さを抑えてスクロールさせる */
+.detail-description {
+  margin-top: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 /* クリックでそのタグの絞り込みに追加できる (複数選べて OR で効く) */
 .tag-chip {
   background: var(--surface-2);
