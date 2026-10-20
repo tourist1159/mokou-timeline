@@ -205,6 +205,14 @@ function renderInfoBox(infoBox, item) {
     infoBox.appendChild(v);
   }
 
+  if (item.likes != null) {
+    const l = document.createElement("span");
+    l.className = "likes";
+    l.textContent = fmtCount(item.likes);
+    l.title = `${item.likes.toLocaleString()}件の高評価`;
+    infoBox.appendChild(l);
+  }
+
   if (item.comments != null) {
     const rate = commentRate(item);
     const c = document.createElement("span");

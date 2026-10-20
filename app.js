@@ -224,6 +224,9 @@ function normalizeYouTube(arr) {
     // 再生数。meta fetcher が12時間ごとに取り直すので最大12時間ぶん古い概数。
     // YouTube のみ (Kick/Twitch は未対応なので null → 表示しない)
     views: typeof v.view_count === "number" ? v.view_count : null,
+    // 高評価数。再生数と同じく12時間ごとに取り直す概数。投稿者が非公開にしている
+    // 動画では取得できないので null → 表示しない (YouTube のみ)
+    likes: typeof v.like_count === "number" ? v.like_count : null,
     // メンバー限定配信 (YouTube は再生数も公開していないので views は null になる)
     membersOnly: v.members_only === true,
     // 動画のタグ(キーワード)。YouTube のみで、fetcher が12時間ごとに取り直す。
@@ -556,6 +559,14 @@ function makeCard(item) {
     v.textContent = fmtCount(item.views);
     v.title = `${item.views.toLocaleString()}回視聴`;
     meta.appendChild(v);
+  }
+
+  if (item.likes != null) {
+    const l = document.createElement("span");
+    l.className = "likes";
+    l.textContent = fmtCount(item.likes);
+    l.title = `${item.likes.toLocaleString()}件の高評価`;
+    meta.appendChild(l);
   }
 
   // コメント数。クリックで「総数 ⇄ 1時間あたり(流れの速さ)」を全カードまとめて切り替える。

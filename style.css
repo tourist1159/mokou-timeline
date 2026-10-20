@@ -619,6 +619,8 @@ body {
 .comments.rate::before { content: "⚡ "; }
 /* 再生数 (YouTubeのみ。12時間ごとに更新される概数) */
 .views::before { content: "▶️ "; }
+/* 高評価数 (YouTubeのみ。再生数と同じく12時間ごとに更新される概数) */
+.likes::before { content: "👍 "; }
 
 /* ---- Comment graph modal ---- */
 .graph-modal-backdrop {
