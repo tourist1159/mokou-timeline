@@ -21,8 +21,8 @@
   --tag-stream-border: rgba(168, 50, 50, 0.35);
   --tag-video-color: #1a5fb4;
   --tag-video-border: rgba(26, 95, 180, 0.32);
-  --tag-deleted-color: #9a5b00;
-  --tag-deleted-border: rgba(154, 91, 0, 0.35);
+  /* 無効な正規表現の入力欄を示す色 (キーワード集計パネル) */
+  --invalid-color: #9a5b00;
   /* メンバー限定 (YouTube のメンバーシップ色に寄せた緑) */
   --tag-members-color: #0f7b3f;
   --tag-members-border: rgba(15, 123, 63, 0.35);
@@ -53,8 +53,7 @@
     --tag-stream-border: rgba(255, 100, 100, 0.4);
     --tag-video-color: #9fd0ff;
     --tag-video-border: rgba(62, 166, 255, 0.4);
-    --tag-deleted-color: #ffb066;
-    --tag-deleted-border: rgba(255, 150, 60, 0.45);
+    --invalid-color: #ffb066;
     --tag-members-color: #6ee7a0;
     --tag-members-border: rgba(110, 231, 160, 0.35);
     --notice-color: #ffcf66;
@@ -86,8 +85,7 @@
   --tag-stream-border: rgba(255, 100, 100, 0.4);
   --tag-video-color: #9fd0ff;
   --tag-video-border: rgba(62, 166, 255, 0.4);
-  --tag-deleted-color: #ffb066;
-  --tag-deleted-border: rgba(255, 150, 60, 0.45);
+  --invalid-color: #ffb066;
   --tag-members-color: #6ee7a0;
   --tag-members-border: rgba(110, 231, 160, 0.35);
   --notice-color: #ffcf66;
@@ -593,13 +591,7 @@ body {
 }
 .tag.stream { color: var(--tag-stream-color); border-color: var(--tag-stream-border); }
 .tag.video { color: var(--tag-video-color); border-color: var(--tag-video-border); }
-.tag.deleted { color: var(--tag-deleted-color); border-color: var(--tag-deleted-border); }
 .tag.members { color: var(--tag-members-color); border-color: var(--tag-members-border); }
-
-/* 配信元で削除された動画 (情報は残すがリンクはしない) */
-.card.unavailable { opacity: 0.5; cursor: default; }
-.card.unavailable:hover { transform: none; border-color: var(--border); }
-.card.unavailable .thumb { filter: grayscale(1); }
 .card-date { width: 100%; }
 /* コメント数。<button> だがメタ行に馴染ませたいので、見た目は素のテキストに寄せる
    (クリックで「総数 ⇄ 1時間あたり」の切り替え)。 */
@@ -821,7 +813,7 @@ body {
   outline: none;
 }
 .keyword-editor-input:focus { border-color: var(--accent); }
-.keyword-editor-input.invalid { border-color: var(--tag-deleted-color); }
+.keyword-editor-input.invalid { border-color: var(--invalid-color); }
 .keyword-remove-btn {
   flex: 0 0 auto;
   width: 26px;

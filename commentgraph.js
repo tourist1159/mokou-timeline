@@ -260,13 +260,6 @@ function renderInfoBox(infoBox, item) {
       : `💬 ${fmtCount(item.comments)}件`;
     infoBox.appendChild(c);
   }
-
-  if (!item.available) {
-    const del = document.createElement("span");
-    del.className = "tag deleted";
-    del.textContent = "削除済み";
-    infoBox.appendChild(del);
-  }
 }
 
 function renderTagsBox(tagsBox, tagsList, item) {

@@ -28,7 +28,7 @@ const CONFIG = {
 const SORT_ORDERS = ["desc", "asc", "views", "likes", "comments", "rate"];
 let ALL = [];
 let LIVE = []; // 現在ライブ配信中の一覧 (live_status.json)
-// view/timeline/newMarker/showComments/theme/onlyAvailable は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
+// view/timeline/newMarker/showComments/theme は「表示設定」(localStorage) で永続化する。URLクエリには含めない。
 const state = {
   platform: "all", channel: "all", type: "all", order: "desc", q: "",
   // 期間フィルタ ("YYYY-MM-DD" / 未指定は空文字)。JST基準の日付キーと文字列比較する。
@@ -37,7 +37,6 @@ const state = {
   // 複数指定時は OR = いずれか1つでも付いていれば一致)
   tags: [],
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
-  onlyAvailable: false,
   // カードのコメント欄の表示 "total"=総数 / "rate"=1時間あたり。クリックで切り替える。
   commentMode: "total",
 };
@@ -46,7 +45,7 @@ const state = {
 const SETTINGS_KEY = "mokou-timeline:settings";
 const DEFAULT_SETTINGS = {
   view: "grid", timeline: true, newMarker: true, showComments: true, theme: "system",
-  onlyAvailable: false, commentMode: "total",
+  commentMode: "total",
 };
 
 function loadSettings() {
@@ -68,7 +67,6 @@ function saveSettings() {
         newMarker: state.newMarker,
         showComments: state.showComments,
         theme: state.theme,
-        onlyAvailable: state.onlyAvailable,
         commentMode: state.commentMode,
       })
     );
@@ -418,7 +416,8 @@ function applyFilters() {
       if (state.from && key < state.from) return false;
       if (state.to && key > state.to) return false;
     }
-    if (state.onlyAvailable && !x.available) return false;
+    // 非公開化・削除された動画/配信はタイムラインに出さない (リンク切れを見せないため)
+    if (!x.available) return false;
     if (q && !matchesQuery(x, q)) return false;
     return true;
   });
@@ -504,11 +503,11 @@ function makePlaceholder(item) {
 function makeCard(item) {
   // カード全体は div にし、サムネだけ元動画へのリンクにする
   // (それ以外の部分をクリックすると詳細ポップアップを開くため、動作を分ける)。
-  // 削除済みの動画はサムネもリンクにしない (クリックしても404になるだけのため)。
+  // 非公開化・削除された動画は applyFilters で既に除外済みなので、ここに来るのは
+  // 常に視聴可能なものだけ。
   const card = document.createElement("div");
-  card.className = item.available ? "card" : "card unavailable";
+  card.className = "card";
   if (item.isLive) card.classList.add("live");
-  if (!item.available) card.title = "この動画は配信元で削除されています";
 
   const thumb = makeThumb(item);
   // 配信中はサムネ右上に LIVE バッジを重ねる (サムネの子にすることで、
@@ -520,17 +519,13 @@ function makeCard(item) {
     thumb.appendChild(dot);
   }
 
-  if (item.available) {
-    const thumbLink = document.createElement("a");
-    thumbLink.className = "thumb-link";
-    thumbLink.href = item.url;
-    thumbLink.target = "_blank";
-    thumbLink.rel = "noopener noreferrer";
-    thumbLink.appendChild(thumb);
-    card.appendChild(thumbLink);
-  } else {
-    card.appendChild(thumb);
-  }
+  const thumbLink = document.createElement("a");
+  thumbLink.className = "thumb-link";
+  thumbLink.href = item.url;
+  thumbLink.target = "_blank";
+  thumbLink.rel = "noopener noreferrer";
+  thumbLink.appendChild(thumb);
+  card.appendChild(thumbLink);
 
   const body = document.createElement("div");
   body.className = "card-body";
@@ -599,13 +594,6 @@ function makeCard(item) {
       render();
     });
     meta.appendChild(c);
-  }
-
-  if (!item.available) {
-    const del = document.createElement("span");
-    del.className = "tag deleted";
-    del.textContent = "削除済み";
-    meta.appendChild(del);
   }
 
   body.appendChild(meta);
@@ -874,7 +862,6 @@ function syncSettingsUI() {
   document.getElementById("toggle-timeline").checked = state.timeline;
   document.getElementById("toggle-newmarker").checked = state.newMarker;
   document.getElementById("toggle-comments").checked = state.showComments;
-  document.getElementById("toggle-available").checked = state.onlyAvailable;
 }
 
 /* ===== イベント ===== */
@@ -970,11 +957,6 @@ function wireEvents() {
   });
   document.getElementById("toggle-comments").addEventListener("change", (e) => {
     state.showComments = e.target.checked;
-    saveSettings();
-    render();
-  });
-  document.getElementById("toggle-available").addEventListener("change", (e) => {
-    state.onlyAvailable = e.target.checked;
     saveSettings();
     render();
   });
