@@ -14,9 +14,16 @@
  * localStorage (KEYWORDS_KEY) に保存して次回以降も使う。正規表現1件ずつを別の入力欄に
  * するのは、"8{3,}" のようなパターン自体にカンマを含むものがあり、カンマ区切りの
  * 1本の文字列では表現できないため。
+ *
+ * グラフ凡例をクリックして各キーワードの線をオン/オフする状態も localStorage
+ * (HIDDEN_KEYWORDS_KEY) に保存し、別の配信・次回の訪問でも引き継ぐ。
  */
 
 const KEYWORDS_KEY = "mokou-timeline:keywords";
+// グラフ凡例でオフにしたキーワード (キーワード文字列そのものをキーにする。
+// 「オンのものだけ覚える」ではなく「オフのものだけ覚える」ことで、新しく追加した
+// キーワードは何もしなくても既定でオン=表示になる)。
+const HIDDEN_KEYWORDS_KEY = "mokou-timeline:hiddenKeywords";
 const DEFAULT_KEYWORDS = ["w", "^あ$"];
 // ダーク背景向けの原色はライトテーマの白背景では視認性が落ちる(特に cyan)ため、
 // テーマごとに別の色セットを用意する (chartPalette 参照)。キーワード数がこれより
@@ -41,6 +48,23 @@ function saveKeywords(keywords) {
     // プライベートブラウジング等で保存できなくても、セッション内の表示自体は継続する
   }
 }
+function loadHiddenKeywords() {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEYWORDS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+function saveHiddenKeywords(set) {
+  try {
+    localStorage.setItem(HIDDEN_KEYWORDS_KEY, JSON.stringify([...set]));
+  } catch (e) {
+    // プライベートブラウジング等で保存できなくても、セッション内の表示自体は継続する
+  }
+}
 function isValidRegex(pattern) {
   try {
     new RegExp(pattern, "gi");
@@ -51,6 +75,7 @@ function isValidRegex(pattern) {
 }
 
 let currentKeywords = loadKeywords();
+let hiddenKeywords = loadHiddenKeywords();
 
 // resolvedTheme() は app.js 側で定義 (commentgraph.js は app.js の後に読み込まれる)。
 function chartPalette() {
@@ -325,6 +350,9 @@ function buildKeywordEditor() {
   });
   resetBtn.addEventListener("click", () => {
     currentKeywords = [...DEFAULT_KEYWORDS];
+    // キーワード自体を既定に戻すので、オン/オフも一緒に既定(すべてオン)へ戻す
+    hiddenKeywords.clear();
+    saveHiddenKeywords(hiddenKeywords);
     onKeywordsChanged(editor);
   });
   // 開くたびに作り直す。モーダル自体は使い回すため、開いている間にライト/ダークを
@@ -377,6 +405,8 @@ function renderKeywordRows(editor) {
     removeBtn.setAttribute("aria-label", `キーワード ${i + 1} を削除`);
     removeBtn.addEventListener("click", () => {
       currentKeywords.splice(i, 1);
+      // 消したキーワードのオン/オフ記録も一緒に消す (localStorage に残り続けないように)
+      if (hiddenKeywords.delete(word)) saveHiddenKeywords(hiddenKeywords);
       onKeywordsChanged(editor);
     });
     row.appendChild(removeBtn);
@@ -539,6 +569,7 @@ function renderChart(canvas, agg, item, link, keywords) {
           tension: 0.3,
           pointRadius: 0,
           yAxisID: "yKeyword",
+          hidden: hiddenKeywords.has(word),
         })),
       ],
     },
@@ -553,8 +584,17 @@ function renderChart(canvas, agg, item, link, keywords) {
           onClick: (e, legendItem, legend) => {
             const ch = legend.chart;
             const di = legendItem.datasetIndex;
-            ch.setDatasetVisibility(di, !ch.isDatasetVisible(di));
+            const nowVisible = !ch.isDatasetVisible(di);
+            ch.setDatasetVisibility(di, nowVisible);
             ch.update();
+            // di===0 は「全コメント」の合計線なので対象外。キーワード (di>=1) だけ
+            // オン/オフを保存し、次にこの配信・他の配信を開いたときも引き継ぐ。
+            if (di > 0) {
+              const word = keywords[di - 1];
+              if (nowVisible) hiddenKeywords.delete(word);
+              else hiddenKeywords.add(word);
+              saveHiddenKeywords(hiddenKeywords);
+            }
           },
         },
         tooltip: {
