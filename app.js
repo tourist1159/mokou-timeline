@@ -207,6 +207,28 @@ function fmtRate(n) {
 function normalizeText(t) {
   return (t || "").toLowerCase().replace(/[！!？?\s]/g, "").normalize("NFKC");
 }
+// 概要欄に書かれた #ハッシュタグ を抜き出す。YouTube公式の「タグ」(snippet.tags、動画設定画面の
+// キーワード欄) とは別物で、投稿者が概要欄の本文に書いた #タグ もタグ検索・絞り込みで拾えるように
+// mergeTagsWithHashtags で合流させる。\p{L}/\p{N} は Unicode のカテゴリなので日本語のハッシュタグも
+// 正しく拾える (句読点や空白で自然に区切られる)。
+function extractHashtags(description) {
+  if (!description) return [];
+  const matches = description.match(/#[\p{L}\p{N}_]+/gu) || [];
+  return matches.map((m) => m.slice(1));
+}
+// 公式タグと概要欄ハッシュタグをまとめる。同じタグ (正規化後が一致) が両方にあれば1つにする。
+function mergeTagsWithHashtags(officialTags, description) {
+  const merged = [...officialTags];
+  const seen = new Set(officialTags.map(normalizeText));
+  for (const h of extractHashtags(description)) {
+    const norm = normalizeText(h);
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      merged.push(h);
+    }
+  }
+  return merged;
+}
 function channelLabel(ch) {
   return CONFIG.channelLabels[ch] || ch;
 }
@@ -235,9 +257,10 @@ function normalizeYouTube(arr) {
     likes: typeof v.like_count === "number" ? v.like_count : null,
     // メンバー限定配信 (YouTube は再生数も公開していないので views は null になる)
     membersOnly: v.members_only === true,
-    // 動画のタグ(キーワード)。YouTube のみで、fetcher が12時間ごとに取り直す。
-    // Kick/Twitch には無いので、参照側は x.tags || [] で守る。
-    tags: Array.isArray(v.tags) ? v.tags : [],
+    // 動画のタグ(キーワード)。YouTube 公式のタグ(snippet.tags)に、概要欄の #ハッシュタグ も
+    // 合流させる。fetcher が12時間ごとに取り直す。Kick/Twitch には無いので、参照側は
+    // x.tags || [] で守る。
+    tags: mergeTagsWithHashtags(Array.isArray(v.tags) ? v.tags : [], v.description),
     // 概要欄全文。YouTube のみ、空なら null (詳細ポップアップで動画のみ表示)
     description: typeof v.description === "string" && v.description ? v.description : null,
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
