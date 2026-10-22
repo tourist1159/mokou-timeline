@@ -286,10 +286,35 @@ function renderTagsBox(tagsBox, tagsList, item) {
 
 // 概要欄は動画 (type:"video") のみ表示。配信は含めない (①ユーザーの要望、
 // ②配信アーカイブの概要欄はチャンネル共通の定型文であることが多く情報量が薄いため)。
+// 概要欄の本文を、#ハッシュタグ部分だけ青色・クリック可能なボタンに差し替えて表示する
+// (公式タグ (item.tags) とは見た目も場所も分ける)。クリックするとそのハッシュタグで
+// 絞り込み、ポップアップは閉じる (タグチップのクリックと同じ挙動)。
 function renderDescriptionBox(descriptionBox, descriptionText, item) {
   const show = item.type === "video" && !!item.description;
   descriptionBox.hidden = !show;
-  descriptionText.textContent = show ? item.description : ""; // textContent で XSS 回避
+  descriptionText.textContent = "";
+  if (!show) return;
+
+  // キャプチャ付き正規表現で split すると、マッチ部分 (#タグ) が配列に交互に残る
+  // (例: ["前の文", "#タグ", "後の文"])。奇数番目が常にハッシュタグになる。
+  const parts = item.description.split(/(#[\p{L}\p{N}_]+)/gu);
+  parts.forEach((part, i) => {
+    if (!part) return;
+    if (i % 2 === 1) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "description-hashtag";
+      btn.textContent = part; // "#もこう" そのまま。textContent で XSS 回避
+      btn.title = `ハッシュタグ「${part}」で絞り込む`;
+      btn.addEventListener("click", () => {
+        selectTag(part.slice(1));
+        closeDetail();
+      });
+      descriptionText.appendChild(btn);
+    } else {
+      descriptionText.appendChild(document.createTextNode(part));
+    }
+  });
 }
 
 // ---- キーワード集計の編集パネル ----

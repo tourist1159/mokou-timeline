@@ -707,6 +707,19 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* 概要欄内の #ハッシュタグ。公式タグ (タグ欄のチップ) とは別物と分かるよう、
+   地の文とは違う青色でクリックできることを示す。 */
+.description-hashtag {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  line-height: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+.description-hashtag:hover { text-decoration: underline; }
 /* クリックでそのタグの絞り込みに追加できる (複数選べて OR で効く) */
 .tag-chip {
   background: var(--surface-2);

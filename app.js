@@ -208,26 +208,18 @@ function normalizeText(t) {
   return (t || "").toLowerCase().replace(/[！!？?\s]/g, "").normalize("NFKC");
 }
 // 概要欄に書かれた #ハッシュタグ を抜き出す。YouTube公式の「タグ」(snippet.tags、動画設定画面の
-// キーワード欄) とは別物で、投稿者が概要欄の本文に書いた #タグ もタグ検索・絞り込みで拾えるように
-// mergeTagsWithHashtags で合流させる。\p{L}/\p{N} は Unicode のカテゴリなので日本語のハッシュタグも
-// 正しく拾える (句読点や空白で自然に区切られる)。
+// キーワード欄) とは別物として item.hashtags に持たせる (詳細ポップアップでは概要欄の本文中に
+// 青色・クリック可能に表示し、タグ欄 (item.tags) には出さない)。\p{L}/\p{N} は Unicode の
+// カテゴリなので日本語のハッシュタグも正しく拾える (句読点や空白で自然に区切られる)。
 function extractHashtags(description) {
   if (!description) return [];
   const matches = description.match(/#[\p{L}\p{N}_]+/gu) || [];
   return matches.map((m) => m.slice(1));
 }
-// 公式タグと概要欄ハッシュタグをまとめる。同じタグ (正規化後が一致) が両方にあれば1つにする。
-function mergeTagsWithHashtags(officialTags, description) {
-  const merged = [...officialTags];
-  const seen = new Set(officialTags.map(normalizeText));
-  for (const h of extractHashtags(description)) {
-    const norm = normalizeText(h);
-    if (!seen.has(norm)) {
-      seen.add(norm);
-      merged.push(h);
-    }
-  }
-  return merged;
+// 検索・タグ候補・タグ絞り込みでは、公式タグと概要欄ハッシュタグの両方を対象にする
+// (表示上は分けていても、見つけやすさは両方カバーする)。
+function searchableTags(item) {
+  return [...(item.tags || []), ...(item.hashtags || [])];
 }
 function channelLabel(ch) {
   return CONFIG.channelLabels[ch] || ch;
@@ -257,12 +249,14 @@ function normalizeYouTube(arr) {
     likes: typeof v.like_count === "number" ? v.like_count : null,
     // メンバー限定配信 (YouTube は再生数も公開していないので views は null になる)
     membersOnly: v.members_only === true,
-    // 動画のタグ(キーワード)。YouTube 公式のタグ(snippet.tags)に、概要欄の #ハッシュタグ も
-    // 合流させる。fetcher が12時間ごとに取り直す。Kick/Twitch には無いので、参照側は
-    // x.tags || [] で守る。
-    tags: mergeTagsWithHashtags(Array.isArray(v.tags) ? v.tags : [], v.description),
+    // 動画のタグ(キーワード)。YouTube 公式のタグ(snippet.tags)のみ。fetcher が12時間ごとに
+    // 取り直す。Kick/Twitch には無いので、参照側は x.tags || [] で守る。
+    tags: Array.isArray(v.tags) ? v.tags : [],
     // 概要欄全文。YouTube のみ、空なら null (詳細ポップアップで動画のみ表示)
     description: typeof v.description === "string" && v.description ? v.description : null,
+    // 概要欄から抜き出した #ハッシュタグ (公式タグとは別枠)。詳細ポップアップの概要欄本文内で
+    // 青色・クリック可能に表示する。
+    hashtags: extractHashtags(v.description),
     thumbnail: v.video_id ? `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg` : null,
     available: v.available !== false, // フラグ未設定は視聴可能とみなす
     commentsKey: v.video_id, // comments_github/<commentsKey>_comments.json
@@ -379,7 +373,7 @@ function buildTagIndex() {
   for (const item of ALL) {
     // 同じ動画に同じタグが重複していても1件と数える
     const seen = new Set();
-    for (const raw of item.tags || []) {
+    for (const raw of searchableTags(item)) {
       const norm = normalizeText(raw);
       if (!norm || seen.has(norm)) continue;
       seen.add(norm);
@@ -405,10 +399,11 @@ function suggestTags(qNorm, limit = 10) {
     .slice(0, limit);
 }
 
-// 自由入力の検索はタイトルとタグの両方に当てる (タイトルに無い語でもタグ経由で拾えるように)。
+// 自由入力の検索はタイトル・公式タグ・概要欄ハッシュタグのすべてに当てる
+// (タイトルに無い語でもタグ/ハッシュタグ経由で拾えるように)。
 function matchesQuery(item, q) {
   if (normalizeText(item.title).includes(q)) return true;
-  return (item.tags || []).some((t) => normalizeText(t).includes(q));
+  return searchableTags(item).some((t) => normalizeText(t).includes(q));
 }
 
 function applyFilters() {
@@ -430,7 +425,7 @@ function applyFilters() {
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
-    if (tagsNorm.length && !(x.tags || []).some((t) => tagsNorm.includes(normalizeText(t)))) return false;
+    if (tagsNorm.length && !searchableTags(x).some((t) => tagsNorm.includes(normalizeText(t)))) return false;
     // 期間は JST の日付キー ("YYYY-MM-DD") 同士の文字列比較で判定する。ゼロ埋め固定長
     // なので辞書順＝日付順になり、タイムゾーン計算をせずに端の日を「その日いっぱい」
     // 含められる (タイムライン側の日付グループとも同じ基準になる)。
