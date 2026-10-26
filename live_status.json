@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-26T13:42:48.789033+00:00",
-  "live": []
+  "checked_at": "2026-10-26T15:48:34.570297+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "撮る",
+      "url": "https://www.youtube.com/watch?v=aNGmqSTrE_w",
+      "videoId": "aNGmqSTrE_w",
+      "thumbnail": "https://i.ytimg.com/vi/aNGmqSTrE_w/mqdefault.jpg"
+    }
+  ]
 }
