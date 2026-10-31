@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-31T12:49:47.179660+00:00",
-  "live": []
+  "checked_at": "2026-10-31T16:47:11.951998+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "DRKSで放送！",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/VgEct9UfC7qL/720.webp",
+      "viewers": null
+    }
+  ]
 }
