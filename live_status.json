@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-10-31T23:51:54.905251+00:00",
-  "live": []
+  "checked_at": "2026-11-01T00:10:31.220358+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "僕はクズです...",
+      "url": "https://www.youtube.com/watch?v=sD3G_IarYPs",
+      "videoId": "sD3G_IarYPs",
+      "thumbnail": "https://i.ytimg.com/vi/sD3G_IarYPs/mqdefault.jpg"
+    }
+  ]
 }
