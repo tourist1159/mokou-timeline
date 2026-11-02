@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-02T09:19:12.259587+00:00",
-  "live": []
+  "checked_at": "2026-11-02T09:25:24.437684+00:00",
+  "live": [
+    {
+      "platform": "twitch",
+      "channel": "mokouliszt1",
+      "title": "ムラゲの皆さんで決起会",
+      "url": "https://www.twitch.tv/mokouliszt1",
+      "thumbnail": "https://static-cdn.jtvnw.net/previews-ttv/live_user_mokouliszt1-{width}x{height}.jpg",
+      "viewers": 0
+    }
+  ]
 }
