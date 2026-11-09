@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-09T05:26:42.169857+00:00",
-  "live": []
+  "checked_at": "2026-11-09T08:11:36.880780+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "カット純にきた",
+      "url": "https://www.youtube.com/watch?v=0sbgGn43ytQ",
+      "videoId": "0sbgGn43ytQ",
+      "thumbnail": "https://i.ytimg.com/vi/0sbgGn43ytQ/mqdefault.jpg"
+    }
+  ]
 }
