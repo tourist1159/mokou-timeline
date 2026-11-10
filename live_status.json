@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-10T06:31:46.879698+00:00",
-  "live": []
+  "checked_at": "2026-11-10T11:56:17.907578+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "眠くなるまで",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/cQTpaiXp6wUF/720.webp?versionId=Qr4qIoI1aYiWPRiBePnKvIPcZ8Tvhh7t",
+      "viewers": null
+    }
+  ]
 }
