@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-16T10:00:38.377267+00:00",
-  "live": []
+  "checked_at": "2026-11-16T10:23:16.364555+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "ゆうき君とぷよぷよ対決",
+      "url": "https://www.youtube.com/watch?v=big1vhUM_00",
+      "videoId": "big1vhUM_00",
+      "thumbnail": "https://i.ytimg.com/vi/big1vhUM_00/mqdefault.jpg"
+    }
+  ]
 }
