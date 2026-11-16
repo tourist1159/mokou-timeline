@@ -418,10 +418,16 @@ function applyFilters() {
   // 24時間以内に始まった」の2通り (Kick のライブ判定は videoId を持たないため)。
   const liveIds = new Set(live.map((x) => `${x.platform}:${x.videoId}`).filter((k) => !k.endsWith(":null")));
   const liveTitles = new Set(live.map((x) => `${x.platform}|${x.channel}|${x.title}`));
-  const dayAgo = Date.now() - 86400000;
+  const now = Date.now();
+  const dayAgo = now - 86400000;
+  // タイトル一致だけだと、同じタイトルで配信し直したとき (例: 前夜と同名の枠を翌日も立てる)
+  // 終わった前回のアーカイブまで消えてしまう。いま配信中のものなら「長さ未確定 (0)」か
+  // 「終了時刻 (開始+長さ) が直近」のはずなので、とっくに終わったアーカイブは別物として残す。
+  const ENDED_GRACE_MS = 30 * 60 * 1000;
+  const mayBeOngoing = (x) => !x.durationSec || x.start.getTime() + x.durationSec * 1000 >= now - ENDED_GRACE_MS;
   let list = [...live, ...ALL].filter((x) => {
     if (!x.isLive && liveIds.has(`${x.platform}:${x.videoId}`)) return false;
-    if (!x.isLive && x.start >= dayAgo && liveTitles.has(`${x.platform}|${x.channel}|${x.title}`)) return false;
+    if (!x.isLive && x.start >= dayAgo && mayBeOngoing(x) && liveTitles.has(`${x.platform}|${x.channel}|${x.title}`)) return false;
     if (state.platform !== "all" && x.platform !== state.platform) return false;
     if (state.channel !== "all" && x.channel !== state.channel) return false;
     if (state.type !== "all" && x.type !== state.type) return false;
