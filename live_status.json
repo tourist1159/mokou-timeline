@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-16T11:12:37.320433+00:00",
+  "checked_at": "2026-11-16T11:39:20.907784+00:00",
   "live": [
     {
       "platform": "youtube",
@@ -8,14 +8,6 @@
       "url": "https://www.youtube.com/watch?v=big1vhUM_00",
       "videoId": "big1vhUM_00",
       "thumbnail": "https://i.ytimg.com/vi/big1vhUM_00/mqdefault.jpg"
-    },
-    {
-      "platform": "twitch",
-      "channel": "mokouliszt1",
-      "title": "ゆうき君とぷよぷよ対戦",
-      "url": "https://www.twitch.tv/mokouliszt1",
-      "thumbnail": "https://static-cdn.jtvnw.net/previews-ttv/live_user_mokouliszt1-{width}x{height}.jpg",
-      "viewers": 1135
     }
   ]
 }
