@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-19T10:09:40.488032+00:00",
-  "live": []
+  "checked_at": "2026-11-19T15:32:50.961684+00:00",
+  "live": [
+    {
+      "platform": "kick",
+      "channel": "mokoutoaruotoko",
+      "title": "ハイゲやばい",
+      "url": "https://kick.com/mokoutoaruotoko",
+      "thumbnail": "https://images.kick.com/video_thumbnails/HoxRLbl2K6lU/js7P5okKQR4N/720.webp?versionId=2tuSrXGgq4_LOJndDv7C.O.8FFcRJzht",
+      "viewers": null
+    }
+  ]
 }
