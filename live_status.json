@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-26T11:15:52.029955+00:00",
-  "live": []
+  "checked_at": "2026-11-26T11:58:08.914724+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "最後の晩餐",
+      "url": "https://www.youtube.com/watch?v=T7BtbwuEiQM",
+      "videoId": "T7BtbwuEiQM",
+      "thumbnail": "https://i.ytimg.com/vi/T7BtbwuEiQM/mqdefault.jpg"
+    }
+  ]
 }
