@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-26T16:30:14.912696+00:00",
+  "checked_at": "2026-11-26T17:01:08.378724+00:00",
   "live": [
     {
       "platform": "kick",
@@ -7,7 +7,7 @@
       "title": "さあ",
       "url": "https://kick.com/mokoutoaruotoko",
       "thumbnail": "https://web.kick.com/api/v1/channels/56495977/thumbnail.jpeg?height=720",
-      "viewers": null
+      "viewers": 948
     }
   ]
 }
