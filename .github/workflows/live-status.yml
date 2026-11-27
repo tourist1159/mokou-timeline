@@ -81,8 +81,17 @@ jobs:
               echo "変化なし (commit せず)"
             else
               git commit -m "Update live status [skip ci]"
-              git pull --rebase
-              git push
+              # push 競合でジョブ全体を落とさない。古い run の再実行や二重起動などで
+              # origin が先に進んでいると rebase が live_status.json で衝突し、ここで
+              # exit して数珠つなぎ(次の run の起動)が切れ、ライブ表示が止まっていた。
+              # 衝突時はこちらの最新判定を優先して再試行し、それでも駄目なら origin に
+              # 合わせて捨てる (次の周回(1分後)で最新状態を書き直すので実害はない)。
+              if ! { git pull --rebase -X theirs && git push; }; then
+                echo "::warning::live_status.json の push に失敗。origin に合わせて次の周回でやり直す"
+                git rebase --abort 2>/dev/null || true
+                git fetch origin main
+                git reset --hard origin/main
+              fi
             fi
             elapsed=$(( SECONDS - start ))
             if [ "$elapsed" -ge "$next_dispatch" ]; then
