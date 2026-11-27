@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-27T05:04:21.800936+00:00",
-  "live": []
+  "checked_at": "2026-11-27T06:55:20.425497+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "明日は",
+      "url": "https://www.youtube.com/watch?v=dDu7YvC2v38",
+      "videoId": "dDu7YvC2v38",
+      "thumbnail": "https://i.ytimg.com/vi/dDu7YvC2v38/mqdefault.jpg"
+    }
+  ]
 }
