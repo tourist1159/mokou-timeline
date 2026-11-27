@@ -1,4 +1,13 @@
 {
-  "checked_at": "2026-11-27T11:53:48.450686+00:00",
-  "live": []
+  "checked_at": "2026-11-27T11:57:57.622450+00:00",
+  "live": [
+    {
+      "platform": "youtube",
+      "channel": "mokouliszt",
+      "title": "ハイゲ前直練習",
+      "url": "https://www.youtube.com/watch?v=YS5bKBG6vTU",
+      "videoId": "YS5bKBG6vTU",
+      "thumbnail": "https://i.ytimg.com/vi/YS5bKBG6vTU/mqdefault.jpg"
+    }
+  ]
 }
